@@ -1,4 +1,6 @@
-const API_URL = 'https://job-56f5.onrender.com//api';
+// CHANGE THIS LINE - use relative path
+const API_URL = '/api';
+
 let currentJobs = [];
 
 const jobsGrid = document.getElementById('jobsGrid');
@@ -18,6 +20,7 @@ async function fetchJobs() {
     jobsGrid.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading jobs from Indeed, JSearch & LinkedIn...</div>';
     
     try {
+        // This will call https://job-56f5.onrender.com/api/jobs
         const url = `${API_URL}/jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&source=${source}`;
         const response = await fetch(url);
         
@@ -39,8 +42,7 @@ async function fetchJobs() {
         jobsGrid.innerHTML = `
             <div class="loading">
                 <i class="fas fa-exclamation-triangle"></i>
-                <p>Backend not running. Please start the backend server:</p>
-                <code style="display: block; margin-top: 1rem;">cd backend && npm start</code>
+                <p>Cannot connect to backend. Please check if server is running.</p>
             </div>
         `;
     }
