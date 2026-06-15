@@ -1,4 +1,4 @@
-const API_URL = 'https://YOUR-RENDER-URL.onrender.com/api';
+const API_URL = 'https://job-56f5.onrender.com//api';
 let currentJobs = [];
 
 const jobsGrid = document.getElementById('jobsGrid');
