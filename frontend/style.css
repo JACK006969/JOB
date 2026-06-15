@@ -1,0 +1,287 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
+    color: #1a2c3e;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.header {
+    background: linear-gradient(135deg, #0f2b3d 0%, #1b4f6e 100%);
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+    text-align: center;
+    color: white;
+    border-radius: 0 0 2rem 2rem;
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+}
+
+.header h1 i {
+    background: #ffd966;
+    color: #0f2b3d;
+    padding: 0.5rem;
+    border-radius: 1rem;
+    margin-right: 0.5rem;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem 1.2rem;
+    border-radius: 2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.controls-bar {
+    background: white;
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid #e2edf2;
+}
+
+.search-section {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+}
+
+.search-section input,
+.search-section select,
+.search-section button {
+    padding: 0.8rem 1rem;
+    border: 1px solid #cbdde6;
+    border-radius: 0.8rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+
+.search-section input {
+    flex: 2;
+    min-width: 200px;
+}
+
+.search-section select {
+    background: white;
+    cursor: pointer;
+}
+
+.search-section button {
+    background: #1b5e7a;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: 0.2s;
+    font-weight: 600;
+}
+
+.search-section button:hover {
+    background: #0f445c;
+    transform: scale(0.98);
+}
+
+.sort-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2edf2;
+}
+
+.sort-group {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: #f1f6fa;
+    padding: 0.3rem 1rem;
+    border-radius: 2rem;
+}
+
+.sort-group label {
+    font-weight: 500;
+}
+
+.sort-group select {
+    padding: 0.3rem 0.8rem;
+    border-radius: 2rem;
+    border: 1px solid #cbdde6;
+    background: white;
+}
+
+.stats {
+    display: flex;
+    gap: 1rem;
+    background: #f1f6fa;
+    padding: 0.3rem 1rem;
+    border-radius: 2rem;
+    font-size: 0.85rem;
+}
+
+.jobs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.job-card {
+    background: white;
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    border: 1px solid #e6edf2;
+    position: relative;
+}
+
+.job-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 30px -12px rgba(0,0,0,0.12);
+    border-color: #c0d8e5;
+}
+
+.source-badge {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #f1f6fa;
+    padding: 0.2rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
+.source-badge.jsearch { background: #ff6b35; color: white; }
+.source-badge.indeed { background: #003d9b; color: white; }
+.source-badge.linkedin { background: #0077b5; color: white; }
+
+.job-title {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0e3f57;
+    margin-bottom: 0.3rem;
+    padding-right: 4rem;
+}
+
+.company {
+    font-weight: 600;
+    color: #2c6e9e;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 0.8rem 0;
+}
+
+.details span {
+    background: #eff3f9;
+    padding: 0.2rem 0.7rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.salary-badge {
+    background: #e1f0f5 !important;
+    color: #116b56;
+}
+
+.desc {
+    font-size: 0.85rem;
+    color: #4a6272;
+    margin: 0.8rem 0 1rem;
+    line-height: 1.45;
+}
+
+.apply-btn {
+    background: #1b5e7a;
+    color: white;
+    text-align: center;
+    padding: 0.7rem;
+    border-radius: 2rem;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    transition: 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.apply-btn:hover {
+    background: #0f445c;
+    transform: scale(0.98);
+}
+
+.loading {
+    text-align: center;
+    padding: 4rem;
+    color: #1b5e7a;
+    font-size: 1.1rem;
+}
+
+footer {
+    text-align: center;
+    padding: 2rem;
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    border-top: 1px solid #e2edf2;
+    margin-top: 2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@media (max-width: 768px) {
+    .container { padding: 0 1rem; }
+    .header h1 { font-size: 1.8rem; }
+    .jobs-grid { grid-template-columns: 1fr; }
+    .search-section { flex-direction: column; }
+    .sort-section { flex-direction: column; align-items: stretch; }
+}
