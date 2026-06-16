@@ -17,6 +17,7 @@
                 <div class="stat-card"><i class="fas fa-building"></i> 50+ Companies</div>
                 <div class="stat-card"><i class="fas fa-rupee-sign"></i> Fresher Friendly</div>
                 <div class="stat-card"><i class="fas fa-map-marker-alt"></i> Kolkata</div>
+                <div class="stat-card"><i class="fas fa-robot"></i> AI Powered</div>
             </div>
         </div>
     </div>
@@ -24,8 +25,7 @@
     <div class="container">
         <div class="controls-bar">
             <div class="search-section">
-                <!-- Change this line -->
-<input type="text" id="searchInput" placeholder="Search any job role... (e.g., software engineer, data analyst, graphic designer)" value="">
+                <input type="text" id="searchInput" placeholder="Search any job... (e.g., software engineer, data analyst, marketing)" value="digital marketing">
                 <select id="locationSelect">
                     <option value="Kolkata">Kolkata</option>
                     <option value="Bangalore">Bangalore</option>
@@ -33,15 +33,17 @@
                     <option value="Delhi">Delhi NCR</option>
                     <option value="Hyderabad">Hyderabad</option>
                     <option value="Pune">Pune</option>
+                    <option value="Chennai">Chennai</option>
                 </select>
-<select id="sourceSelect">
-    <option value="all">All Sources (5 APIs)</option>
-    <option value="jsearch">JSearch (Indeed/LinkedIn/Glassdoor)</option>
-    <option value="activejobs">Active Jobs DB (AI-Enriched)</option>
-    <option value="prlabs">PR Labs (LinkedIn/Indeed/ZipRecruiter)</option>
-    <option value="indeed">Indeed RSS</option>
-    <option value="linkedin">LinkedIn (Simulated)</option>
-</select>
+                <select id="sourceSelect">
+                    <option value="all">All Sources (6 APIs)</option>
+                    <option value="jsearch">JSearch (Indeed/LinkedIn/Glassdoor)</option>
+                    <option value="activejobs">Active Jobs DB (AI-Enriched)</option>
+                    <option value="prlabs">PR Labs (LinkedIn/Indeed/ZipRecruiter)</option>
+                    <option value="indeed">Indeed RSS</option>
+                    <option value="linkedin">LinkedIn (Simulated)</option>
+                    <option value="grok">🤖 Grok AI</option>
+                </select>
                 <button id="searchBtn"><i class="fas fa-search"></i> Search</button>
             </div>
             <div class="sort-section">
@@ -62,13 +64,13 @@
 
         <div class="jobs-grid" id="jobsGrid">
             <div class="loading">
-                <i class="fas fa-spinner fa-spin"></i> Loading jobs from Indeed, JSearch & LinkedIn...
+                <i class="fas fa-spinner fa-spin"></i> Loading jobs from 6 sources: JSearch, Indeed, PR Labs, Active Jobs DB, LinkedIn & Grok AI...
             </div>
         </div>
     </div>
 
     <footer>
-        <p>Powered by Indeed RSS + JSearch API + LinkedIn | Backend: Node.js | Deploy on Render</p>
+        <p>Powered by JSearch, PR Labs, Active Jobs DB, Indeed RSS, LinkedIn & 🤖 Grok AI | Backend: Node.js | Deploy on Render</p>
     </footer>
 
     <script src="script.js"></script>
