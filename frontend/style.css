@@ -181,6 +181,8 @@ body {
 }
 
 .source-badge.jsearch { background: #ff6b35; color: white; }
+.source-badge.activejobs { background: #9b59b6; color: white; }
+.source-badge.prlabs { background: #3498db; color: white; }
 .source-badge.indeed { background: #003d9b; color: white; }
 .source-badge.linkedin { background: #0077b5; color: white; }
 
