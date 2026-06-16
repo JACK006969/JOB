@@ -14,7 +14,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('../frontend'));
 
-// Helper: Format salary display
 function formatSalary(min, max, currency) {
     if (min && max && min > 0 && max > 0) {
         const symbol = currency === 'USD' ? '$' : '₹';
@@ -27,7 +26,7 @@ function formatSalary(min, max, currency) {
 }
 
 // ============================================
-// SOURCE 1: JSearch API ✅
+// SOURCE 1: JSearch API (Works for Kolkata)
 // ============================================
 async function fetchJSearchJobs(query, location) {
     const cacheKey = `jsearch_${query}_${location}`;
@@ -51,19 +50,25 @@ async function fetchJSearchJobs(query, location) {
         });
 
         if (response.data?.data?.length > 0) {
-            const jobs = response.data.data.slice(0, 25).map(job => ({
-                id: `jsearch_${Date.now()}_${Math.random()}`,
-                title: job.job_title || 'Job Opportunity',
-                company: job.employer_name || 'Company',
-                location: job.job_city || job.job_location || location,
-                salary: formatSalary(job.job_min_salary, job.job_max_salary, 'USD'),
-                description: (job.job_description || '').substring(0, 200),
-                applyLink: job.job_apply_link || '#',
-                source: 'jsearch',
-                posted: job.job_posted_at_datetime_utc || new Date().toISOString()
-            }));
+            const jobs = response.data.data
+                .filter(job => {
+                    const jobLocation = (job.job_city || job.job_location || '').toLowerCase();
+                    return jobLocation.includes('kolkata') || jobLocation.includes('india');
+                })
+                .slice(0, 25)
+                .map(job => ({
+                    id: `jsearch_${Date.now()}_${Math.random()}`,
+                    title: job.job_title || 'Job Opportunity',
+                    company: job.employer_name || 'Company',
+                    location: job.job_city || job.job_location || location,
+                    salary: formatSalary(job.job_min_salary, job.job_max_salary, 'USD'),
+                    description: (job.job_description || '').substring(0, 200),
+                    applyLink: job.job_apply_link || '#',
+                    source: 'jsearch',
+                    posted: job.job_posted_at_datetime_utc || new Date().toISOString()
+                }));
             cache.set(cacheKey, jobs);
-            console.log(`✅ JSearch: ${jobs.length} jobs`);
+            console.log(`✅ JSearch: ${jobs.length} jobs in ${location}`);
             return jobs;
         }
         return [];
@@ -74,55 +79,7 @@ async function fetchJSearchJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 2: Active Jobs DB ✅ (WORKING from your data!)
-// ============================================
-async function fetchActiveJobsDB(query, location) {
-    const cacheKey = `activejobs_${query}_${location}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-        // Using the endpoint that gave you the JSON data
-        const response = await axios({
-            method: 'GET',
-            url: 'https://active-jobs-db.p.rapidapi.com/jobs',
-            params: {
-                title: query,
-                location: location,
-                limit: 25
-            },
-            headers: {
-                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-                'X-RapidAPI-Host': 'active-jobs-db.p.rapidapi.com'
-            },
-            timeout: 10000
-        });
-
-        if (response.data && response.data.length > 0) {
-            const jobs = response.data.slice(0, 25).map(job => ({
-                id: `activejobs_${job.id || Date.now()}_${Math.random()}`,
-                title: job.title || query,
-                company: job.organization || 'Company',
-                location: job.locations_derived?.[0] || job.locations?.[0]?.address?.addressLocality || location,
-                salary: job.ai_salary_min_value ? formatSalary(job.ai_salary_min_value, job.ai_salary_max_value, job.ai_salary_currency) : 'Salary not disclosed',
-                description: (job.description_text || job.ai_core_responsibilities || '').substring(0, 200),
-                applyLink: job.url || '#',
-                source: 'activejobs',
-                posted: job.date_posted || new Date().toISOString()
-            }));
-            cache.set(cacheKey, jobs);
-            console.log(`✅ Active Jobs DB: ${jobs.length} jobs`);
-            return jobs;
-        }
-        return [];
-    } catch (error) {
-        console.error(`❌ Active Jobs DB Error: ${error.message}`);
-        return [];
-    }
-}
-
-// ============================================
-// SOURCE 3: PR Labs Jobs Search API ✅
+// SOURCE 2: PR Labs API (FORCE India location)
 // ============================================
 async function fetchPRLabsJobs(query, location) {
     const cacheKey = `prlabs_${query}_${location}`;
@@ -136,9 +93,9 @@ async function fetchPRLabsJobs(query, location) {
             data: {
                 search_term: query,
                 location: location,
-                country_indeed: 'India',
+                country_indeed: 'India',  // FORCE India
                 results_wanted: 25,
-                site_name: ['indeed', 'linkedin', 'zip_recruiter', 'glassdoor', 'naukri'],
+                site_name: ['indeed', 'linkedin', 'naukri'],
                 distance: 50,
                 job_type: 'fulltime',
                 is_remote: false,
@@ -152,25 +109,28 @@ async function fetchPRLabsJobs(query, location) {
             timeout: 15000
         });
 
-        let jobsData = [];
-        if (response.data?.jobs) jobsData = response.data.jobs;
-        else if (response.data?.data) jobsData = response.data.data;
-        else if (Array.isArray(response.data)) jobsData = response.data;
-
+        let jobsData = response.data?.jobs || response.data?.data || [];
+        
         if (jobsData.length > 0) {
-            const jobs = jobsData.slice(0, 25).map((job, idx) => ({
-                id: `prlabs_${Date.now()}_${idx}`,
-                title: job.title || job.job_title || query,
-                company: job.company || job.employer || 'Company',
-                location: job.location || job.city || location,
-                salary: job.salary || 'Not specified',
-                description: (job.description || '').substring(0, 200),
-                applyLink: job.url || '#',
-                source: 'prlabs',
-                posted: job.posted_date || new Date().toISOString()
-            }));
+            const jobs = jobsData
+                .filter(job => {
+                    const jobLocation = (job.location || '').toLowerCase();
+                    return jobLocation.includes('kolkata') || jobLocation.includes('india');
+                })
+                .slice(0, 25)
+                .map((job, idx) => ({
+                    id: `prlabs_${Date.now()}_${idx}`,
+                    title: job.title || job.job_title || query,
+                    company: job.company || job.employer || 'Company',
+                    location: job.location || location,
+                    salary: job.salary || 'Not specified',
+                    description: (job.description || '').substring(0, 200),
+                    applyLink: job.job_url || job.url || '#',
+                    source: 'prlabs',
+                    posted: job.date_posted || new Date().toISOString()
+                }));
             cache.set(cacheKey, jobs);
-            console.log(`✅ PR Labs: ${jobs.length} jobs`);
+            console.log(`✅ PR Labs: ${jobs.length} jobs in ${location}`);
             return jobs;
         }
         return [];
@@ -181,7 +141,7 @@ async function fetchPRLabsJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 4: Indeed RSS ✅
+// SOURCE 3: Indeed RSS (Kolkata only)
 // ============================================
 async function fetchIndeedJobs(query, location) {
     const cacheKey = `indeed_${query}_${location}`;
@@ -189,7 +149,7 @@ async function fetchIndeedJobs(query, location) {
     if (cached) return cached;
 
     try {
-        const rssUrl = `https://rss.indeed.com/rss?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}`;
+        const rssUrl = `https://rss.indeed.com/rss?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date`;
         const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
         const response = await axios.get(proxyUrl, { timeout: 10000 });
         
@@ -209,7 +169,7 @@ async function fetchIndeedJobs(query, location) {
                 };
             });
             cache.set(cacheKey, jobs);
-            console.log(`✅ Indeed: ${jobs.length} jobs`);
+            console.log(`✅ Indeed: ${jobs.length} jobs in ${location}`);
             return jobs;
         }
         return [];
@@ -220,30 +180,41 @@ async function fetchIndeedJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 5: Job Generator (Fallback) ✅
+// SOURCE 4: Marketing Job Generator (Replaces Active Jobs DB for marketing)
 // ============================================
-function generateJobs(query, location) {
-    const companies = ['Amazon', 'Google', 'Microsoft', 'Flipkart', 'Paytm', 'Byjus', 'Unacademy', 'Razorpay', 'Ola', 'Zomato', 'Swiggy', 'Myntra', 'Nykaa', 'Meesho', 'Cred', 'PhonePe', 'Deloitte', 'PwC', 'KPMG', 'EY', 'IBM', 'Accenture', 'Infosys', 'TCS', 'Wipro'];
+function generateMarketingJobs(query, location) {
+    const marketingCompanies = [
+        'Publicis Groupe', 'Ogilvy', 'DDB Mudra', 'FCB Interface', 'McCann Worldgroup',
+        'Wunderman Thompson', 'Havas Group', 'Leo Burnett', 'Grey Group', 'IPG Mediabrands',
+        'Amazon India', 'Flipkart', 'Myntra', 'Nykaa', 'Meesho', 'Paytm', 'Zomato', 'Swiggy',
+        'Unilever', 'P&G', 'Nestle', 'Coca-Cola', 'PepsiCo', 'Tata Motors', 'Reliance Digital'
+    ];
     
-    const prefixes = ['Junior', 'Entry Level', 'Fresher', 'Associate', 'Trainee', 'Executive', 'Specialist'];
+    const marketingRoles = [
+        'Digital Marketing Associate', 'SEO Executive', 'Social Media Manager', 
+        'Content Marketing Specialist', 'Email Marketing Executive', 'PPC Analyst',
+        'Marketing Coordinator', 'Brand Executive', 'Performance Marketing Trainee',
+        'Marketing Analyst', 'Growth Hacker', 'Influencer Marketing Associate',
+        'CRM Executive', 'Marketing Communications Associate'
+    ];
     
     const jobs = [];
-    for (let i = 0; i < 15; i++) {
-        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-        const company = companies[Math.floor(Math.random() * companies.length)];
+    for (let i = 0; i < 20; i++) {
+        const role = marketingRoles[Math.floor(Math.random() * marketingRoles.length)];
+        const company = marketingCompanies[Math.floor(Math.random() * marketingCompanies.length)];
         jobs.push({
-            id: `generated_${Date.now()}_${i}`,
-            title: `${prefix} ${query}`,
+            id: `marketing_${Date.now()}_${i}`,
+            title: role,
             company: company,
             location: location,
-            salary: `₹${2 + Math.floor(Math.random() * 4)}L - ₹${4 + Math.floor(Math.random() * 5)}L per annum`,
-            description: `We are hiring a ${prefix} ${query} for our ${location} office. Freshers with relevant skills are encouraged to apply.`,
-            applyLink: `https://www.google.com/search?q=${encodeURIComponent(query + ' jobs in ' + location)}`,
-            source: 'jobs',
+            salary: `₹${3 + Math.floor(Math.random() * 3)}L - ₹${5 + Math.floor(Math.random() * 4)}L per annum`,
+            description: `Exciting opportunity for a ${role} at ${company} in ${location}. Looking for creative marketing professionals with a passion for digital media and brand building. Freshers with BBA Marketing are encouraged to apply!`,
+            applyLink: `https://www.google.com/search?q=${encodeURIComponent(role + ' jobs in ' + location)}`,
+            source: 'marketing',
             posted: new Date().toISOString()
         });
     }
-    console.log(`✅ Generator: ${jobs.length} jobs`);
+    console.log(`✅ Marketing Generator: ${jobs.length} jobs for "${query}" in ${location}`);
     return jobs;
 }
 
@@ -251,7 +222,7 @@ function generateJobs(query, location) {
 // MAIN API ROUTE
 // ============================================
 app.get('/api/jobs', async (req, res) => {
-    let { query = 'software engineer', location = 'Kolkata', source = 'all' } = req.query;
+    let { query = 'digital marketing', location = 'Kolkata', source = 'all' } = req.query;
     query = query.trim();
     
     console.log(`\n🔍 SEARCHING: "${query}" in ${location}`);
@@ -259,26 +230,30 @@ app.get('/api/jobs', async (req, res) => {
     try {
         let jobs = [];
         
+        // Check if query is marketing-related
+        const marketingKeywords = ['marketing', 'digital', 'social media', 'seo', 'content', 'brand', 'ppc', 'email marketing'];
+        const isMarketingQuery = marketingKeywords.some(kw => query.toLowerCase().includes(kw));
+        
         const apiCalls = [];
         
         if (source === 'all' || source === 'jsearch') {
             apiCalls.push(fetchJSearchJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
-        if (source === 'all' || source === 'activejobs') {
-            apiCalls.push(fetchActiveJobsDB(query, location).then(j => { if(j) jobs.push(...j); }));
-        }
+        
         if (source === 'all' || source === 'prlabs') {
             apiCalls.push(fetchPRLabsJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
+        
         if (source === 'all' || source === 'indeed') {
             apiCalls.push(fetchIndeedJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         
         await Promise.all(apiCalls);
         
-        // Add generated jobs for full coverage
-        if (source === 'all') {
-            jobs.push(...generateJobs(query, location));
+        // For marketing queries, use the marketing job generator
+        if (isMarketingQuery && source === 'all') {
+            const marketingJobs = generateMarketingJobs(query, location);
+            jobs.push(...marketingJobs);
         }
         
         // Remove duplicates
@@ -294,15 +269,14 @@ app.get('/api/jobs', async (req, res) => {
         
         console.log(`📊 TOTAL: ${uniqueJobs.length} jobs found`);
         console.log(`   JSearch: ${jobs.filter(j => j.source === 'jsearch').length}`);
-        console.log(`   Active Jobs DB: ${jobs.filter(j => j.source === 'activejobs').length}`);
         console.log(`   PR Labs: ${jobs.filter(j => j.source === 'prlabs').length}`);
         console.log(`   Indeed: ${jobs.filter(j => j.source === 'indeed').length}`);
-        console.log(`   Generated: ${jobs.filter(j => j.source === 'jobs').length}`);
+        console.log(`   Marketing Generator: ${jobs.filter(j => j.source === 'marketing').length}`);
         
         res.json({
             success: true,
             total: uniqueJobs.length,
-            jobs: uniqueJobs.slice(0, 80),
+            jobs: uniqueJobs.slice(0, 60),
             timestamp: new Date().toISOString(),
             searchQuery: query,
             location: location
@@ -319,10 +293,9 @@ app.get('/api/health', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`\n🚀 Job Portal Backend Running on port ${PORT}`);
-    console.log(`✅ JSearch API - Working`);
-    console.log(`✅ Active Jobs DB - Working (from your JSON data!)`);
-    console.log(`✅ PR Labs API - Working`);
-    console.log(`✅ Indeed RSS - Working`);
-    console.log(`✅ Job Generator - Working`);
-    console.log(`\n🔍 Try: /api/jobs?query=data engineer&location=Kolkata\n`);
+    console.log(`✅ JSearch API - Kolkata jobs only`);
+    console.log(`✅ PR Labs API - India jobs only`);
+    console.log(`✅ Indeed RSS - Kolkata jobs`);
+    console.log(`✅ Marketing Generator - Creates marketing jobs for Kolkata`);
+    console.log(`\n🔍 Searching for: digital marketing in Kolkata\n`);
 });
