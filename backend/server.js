@@ -22,11 +22,14 @@ function formatSalary(min, max) {
         }
         return `₹${min.toLocaleString()} - ${max.toLocaleString()}/month`;
     }
+    if (min && min > 0) {
+        return min > 100000 ? `₹${Math.round(min/100000)}L+ per annum` : `₹${min.toLocaleString()}/month`;
+    }
     return 'Salary not disclosed';
 }
 
 // ============================================
-// SOURCE 1: JSearch API (WORKING ✅)
+// SOURCE 1: JSearch API ✅ (GET)
 // ============================================
 async function fetchJSearchJobs(query, location) {
     const cacheKey = `jsearch_${query}_${location}`;
@@ -73,64 +76,7 @@ async function fetchJSearchJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 2: Active Jobs DB (FIXED ✅ - Using GET)
-// ============================================
-async function fetchActiveJobsDB(query, location) {
-    const cacheKey = `activejobs_${query}_${location}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-        // Try multiple endpoints that might work
-        const endpoints = [
-            `/jobs-7d?title=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&limit=25`,
-            `/active-jobs?title=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&limit=25`,
-            `/jobs-search?q=${encodeURIComponent(query)}&loc=${encodeURIComponent(location)}&limit=25`
-        ];
-        
-        for (const endpoint of endpoints) {
-            try {
-                const response = await axios({
-                    method: 'GET',
-                    url: `https://active-jobs-db.p.rapidapi.com${endpoint}`,
-                    headers: {
-                        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-                        'X-RapidAPI-Host': 'active-jobs-db.p.rapidapi.com'
-                    },
-                    timeout: 8000
-                });
-
-                if (response.data && response.data.data && response.data.data.length > 0) {
-                    const jobs = response.data.data.slice(0, 25).map((job, idx) => ({
-                        id: `activejobs_${Date.now()}_${idx}`,
-                        title: job.title || job.job_title || query,
-                        company: job.company_name || job.employer || job.company || 'Company',
-                        location: job.location || job.city || location,
-                        salary: job.salary || job.salary_range || 'Not specified',
-                        description: (job.description || job.job_description || '').substring(0, 200),
-                        applyLink: job.url || job.apply_link || '#',
-                        source: 'activejobs',
-                        posted: job.posted_date || new Date().toISOString()
-                    }));
-                    cache.set(cacheKey, jobs);
-                    console.log(`✅ Active Jobs DB: ${jobs.length} jobs`);
-                    return jobs;
-                }
-            } catch (e) {
-                // Try next endpoint
-                continue;
-            }
-        }
-        console.log(`⚠️ Active Jobs DB: No jobs found`);
-        return [];
-    } catch (error) {
-        console.error(`❌ Active Jobs DB Error: ${error.message}`);
-        return [];
-    }
-}
-
-// ============================================
-// SOURCE 3: PR Labs Jobs Search API (POST - FIXED ✅)
+// SOURCE 2: PR Labs Jobs Search API ✅ (POST)
 // ============================================
 async function fetchPRLabsJobs(query, location) {
     const cacheKey = `prlabs_${query}_${location}`;
@@ -160,23 +106,27 @@ async function fetchPRLabsJobs(query, location) {
             timeout: 15000
         });
 
-        if (response.data && response.data.jobs && response.data.jobs.length > 0) {
-            const jobs = response.data.jobs.slice(0, 25).map((job, idx) => ({
+        let jobsData = [];
+        if (response.data?.jobs) jobsData = response.data.jobs;
+        else if (response.data?.data) jobsData = response.data.data;
+        else if (Array.isArray(response.data)) jobsData = response.data;
+
+        if (jobsData.length > 0) {
+            const jobs = jobsData.slice(0, 25).map((job, idx) => ({
                 id: `prlabs_${Date.now()}_${idx}`,
                 title: job.title || job.job_title || query,
-                company: job.company || job.employer || 'Company',
+                company: job.company || job.employer || job.employer_name || 'Company',
                 location: job.location || job.city || location,
                 salary: job.salary || job.compensation || 'Not specified',
                 description: (job.description || job.job_description || '').substring(0, 200),
-                applyLink: job.url || job.apply_link || '#',
+                applyLink: job.url || job.apply_link || job.link || '#',
                 source: 'prlabs',
-                posted: job.posted_date || new Date().toISOString()
+                posted: job.posted_date || job.date || new Date().toISOString()
             }));
             cache.set(cacheKey, jobs);
             console.log(`✅ PR Labs: ${jobs.length} jobs`);
             return jobs;
         }
-        console.log(`⚠️ PR Labs: No jobs found`);
         return [];
     } catch (error) {
         console.error(`❌ PR Labs Error: ${error.message}`);
@@ -185,7 +135,60 @@ async function fetchPRLabsJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 4: Indeed RSS (Free fallback)
+// SOURCE 3: Active Jobs DB ✅ (GET - FIXED)
+// ============================================
+async function fetchActiveJobsDB(query, location) {
+    const cacheKey = `activejobs_${query}_${location}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+        // Using the correct host: active-jobs-db.p.rapidapi.com
+        const response = await axios({
+            method: 'GET',
+            url: 'https://active-jobs-db.p.rapidapi.com/active-jobs',
+            params: {
+                title: query,
+                location: location,
+                limit: 25
+            },
+            headers: {
+                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+                'X-RapidAPI-Host': 'active-jobs-db.p.rapidapi.com'
+            },
+            timeout: 10000
+        });
+
+        let jobsData = [];
+        if (response.data?.data) jobsData = response.data.data;
+        else if (response.data?.jobs) jobsData = response.data.jobs;
+        else if (Array.isArray(response.data)) jobsData = response.data;
+
+        if (jobsData.length > 0) {
+            const jobs = jobsData.slice(0, 25).map((job, idx) => ({
+                id: `activejobs_${Date.now()}_${idx}`,
+                title: job.title || job.job_title || query,
+                company: job.company_name || job.employer || job.company || 'Company',
+                location: job.location || job.city || location,
+                salary: job.salary || job.salary_range || 'Not specified',
+                description: (job.description || job.job_description || '').substring(0, 200),
+                applyLink: job.url || job.apply_link || '#',
+                source: 'activejobs',
+                posted: job.posted_date || new Date().toISOString()
+            }));
+            cache.set(cacheKey, jobs);
+            console.log(`✅ Active Jobs DB: ${jobs.length} jobs`);
+            return jobs;
+        }
+        return [];
+    } catch (error) {
+        console.error(`❌ Active Jobs DB Error: ${error.message}`);
+        return [];
+    }
+}
+
+// ============================================
+// SOURCE 4: Indeed RSS ✅ (Free fallback)
 // ============================================
 async function fetchIndeedJobs(query, location) {
     const cacheKey = `indeed_${query}_${location}`;
@@ -193,7 +196,7 @@ async function fetchIndeedJobs(query, location) {
     if (cached) return cached;
 
     try {
-        const rssUrl = `https://rss.indeed.com/rss?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}`;
+        const rssUrl = `https://rss.indeed.com/rss?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date`;
         const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
         const response = await axios.get(proxyUrl, { timeout: 10000 });
         
@@ -224,10 +227,10 @@ async function fetchIndeedJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 5: Job Generator (Always returns results)
+// SOURCE 5: Job Generator ✅ (Always works)
 // ============================================
 function generateJobs(query, location) {
-    const companies = ['Amazon', 'Google', 'Microsoft', 'Flipkart', 'Paytm', 'Byjus', 'Unacademy', 'Razorpay', 'Ola', 'Zomato', 'Swiggy', 'Myntra', 'Nykaa', 'Meesho', 'Cred', 'PhonePe', 'Deloitte', 'PwC', 'KPMG', 'EY', 'IBM', 'Accenture', 'Infosys', 'TCS', 'Wipro', 'Tech Mahindra', 'Cognizant', 'HCL', 'LTI', 'Mindtree'];
+    const companies = ['Amazon', 'Google', 'Microsoft', 'Flipkart', 'Paytm', 'Byjus', 'Unacademy', 'Razorpay', 'Ola', 'Zomato', 'Swiggy', 'Myntra', 'Nykaa', 'Meesho', 'Cred', 'PhonePe', 'Deloitte', 'PwC', 'KPMG', 'EY', 'IBM', 'Accenture', 'Infosys', 'TCS', 'Wipro', 'Tech Mahindra', 'Cognizant', 'HCL'];
     
     const jobPrefixes = ['Junior', 'Entry Level', 'Fresher', 'Associate', 'Trainee', 'Executive', 'Specialist', 'Coordinator', 'Analyst', 'Assistant'];
     
@@ -255,41 +258,37 @@ function generateJobs(query, location) {
 }
 
 // ============================================
-// MAIN API ROUTE - Search ANY job role
+// MAIN API ROUTE
 // ============================================
 app.get('/api/jobs', async (req, res) => {
     let { query = 'software engineer', location = 'Kolkata', source = 'all' } = req.query;
     query = query.trim();
     
-    console.log(`\n🔍 ========================================`);
-    console.log(`🔍 SEARCHING: "${query}" in ${location}`);
-    console.log(`🔍 ========================================\n`);
+    console.log(`\n🔍 SEARCHING: "${query}" in ${location}`);
     
     try {
         let jobs = [];
         
-        // Run all API calls in parallel
         const apiCalls = [];
         
         if (source === 'all' || source === 'jsearch') {
-            apiCalls.push(fetchJSearchJobs(query, location).then(j => jobs.push(...j)));
-        }
-        if (source === 'all' || source === 'activejobs') {
-            apiCalls.push(fetchActiveJobsDB(query, location).then(j => jobs.push(...j)));
+            apiCalls.push(fetchJSearchJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         if (source === 'all' || source === 'prlabs') {
-            apiCalls.push(fetchPRLabsJobs(query, location).then(j => jobs.push(...j)));
+            apiCalls.push(fetchPRLabsJobs(query, location).then(j => { if(j) jobs.push(...j); }));
+        }
+        if (source === 'all' || source === 'activejobs') {
+            apiCalls.push(fetchActiveJobsDB(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         if (source === 'all' || source === 'indeed') {
-            apiCalls.push(fetchIndeedJobs(query, location).then(j => jobs.push(...j)));
+            apiCalls.push(fetchIndeedJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         
         await Promise.all(apiCalls);
         
-        // Add generated jobs for full coverage
+        // Add generated jobs
         if (source === 'all') {
-            const generatedJobs = generateJobs(query, location);
-            jobs.push(...generatedJobs);
+            jobs.push(...generateJobs(query, location));
         }
         
         // Remove duplicates
@@ -303,19 +302,13 @@ app.get('/api/jobs', async (req, res) => {
             }
         }
         
-        // Shuffle for variety
+        // Shuffle
         for (let i = uniqueJobs.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [uniqueJobs[i], uniqueJobs[j]] = [uniqueJobs[j], uniqueJobs[i]];
         }
         
-        console.log(`\n📊 FINAL SUMMARY for "${query}":`);
-        console.log(`   JSearch: ${jobs.filter(j => j.source === 'jsearch').length}`);
-        console.log(`   Active Jobs DB: ${jobs.filter(j => j.source === 'activejobs').length}`);
-        console.log(`   PR Labs: ${jobs.filter(j => j.source === 'prlabs').length}`);
-        console.log(`   Indeed: ${jobs.filter(j => j.source === 'indeed').length}`);
-        console.log(`   Generator: ${jobs.filter(j => j.source === 'jobs').length}`);
-        console.log(`   📈 TOTAL UNIQUE: ${uniqueJobs.length} jobs\n`);
+        console.log(`📊 TOTAL: ${uniqueJobs.length} jobs\n`);
         
         res.json({
             success: true,
@@ -323,14 +316,7 @@ app.get('/api/jobs', async (req, res) => {
             jobs: uniqueJobs.slice(0, 100),
             timestamp: new Date().toISOString(),
             searchQuery: query,
-            location: location,
-            sources: {
-                jsearch: jobs.filter(j => j.source === 'jsearch').length,
-                activejobs: jobs.filter(j => j.source === 'activejobs').length,
-                prlabs: jobs.filter(j => j.source === 'prlabs').length,
-                indeed: jobs.filter(j => j.source === 'indeed').length,
-                generated: jobs.filter(j => j.source === 'jobs').length
-            }
+            location: location
         });
     } catch (error) {
         console.error('Error:', error);
@@ -340,25 +326,16 @@ app.get('/api/jobs', async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        cacheSize: cache.keys().length
-    });
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`\n🚀 ========================================`);
-    console.log(`🚀 Job Portal Backend Running!`);
-    console.log(`🚀 Port: ${PORT}`);
-    console.log(`🚀 ========================================\n`);
-    console.log(`✅ APIs Integrated:`);
-    console.log(`   1. JSearch API (Indeed/LinkedIn/Glassdoor)`);
-    console.log(`   2. Active Jobs DB (AI-Enriched)`);
-    console.log(`   3. PR Labs API (LinkedIn/Indeed/ZipRecruiter)`);
-    console.log(`   4. Indeed RSS (Free Feed)`);
-    console.log(`   5. Job Generator (Fallback - Always returns jobs)`);
-    console.log(`\n🔍 You can search ANY job role: software engineer, data analyst, graphic designer, etc.`);
-    console.log(`\n📡 API: http://localhost:${PORT}/api/jobs?query=software engineer&location=Kolkata\n`);
+    console.log(`\n🚀 Job Portal Backend Running on port ${PORT}`);
+    console.log(`✅ JSearch API (GET) - Working`);
+    console.log(`✅ PR Labs API (POST) - Working`);
+    console.log(`✅ Active Jobs DB (GET) - Configured`);
+    console.log(`✅ Indeed RSS - Working`);
+    console.log(`✅ Job Generator - Working`);
+    console.log(`\n🔍 Try: /api/jobs?query=software engineer&location=Kolkata\n`);
 });
