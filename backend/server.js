@@ -5,12 +5,6 @@ const NodeCache = require('node-cache');
 const Parser = require('rss-parser');
 require('dotenv').config();
 
-// ============================================
-// AI SDK for Grok (Vercel AI Gateway)
-// ============================================
-const { generateText } = require('ai');
-const { createOpenAI } = require('@ai-sdk/openai');
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 const cache = new NodeCache({ stdTTL: 1800 });
@@ -19,6 +13,11 @@ const parser = new Parser();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('../frontend'));
+
+// ============================================
+// OPENROUTER API KEY (Grok AI - FREE)
+// ============================================
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
 
 // ============================================
 // HELPER: Format salary
@@ -250,7 +249,7 @@ async function fetchIndeedJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 5: Marketing Job Generator
+// SOURCE 5: Marketing Job Generator (Fallback)
 // ============================================
 function generateMarketingJobs(query, location) {
     const marketingCompanies = [
@@ -289,43 +288,40 @@ function generateMarketingJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 6: GROK AI (Vercel AI Gateway)
+// SOURCE 6: GROK AI via OpenRouter (FREE)
 // ============================================
 app.get('/api/grok-jobs', async (req, res) => {
     let { query = 'digital marketing', location = 'Kolkata' } = req.query;
     
-    console.log(`\n🤖 Grok AI Searching: "${query}" in ${location}`);
-    console.log(`🔑 Token exists: ${!!process.env.VERCEL_ACCESS_TOKEN}`);
-    console.log(`🔑 Token length: ${process.env.VERCEL_ACCESS_TOKEN ? process.env.VERCEL_ACCESS_TOKEN.length : 0}`);
-    
-    if (!process.env.VERCEL_ACCESS_TOKEN) {
-        console.error('❌ VERCEL_ACCESS_TOKEN not set - returning fallback jobs');
-        const fallbackJobs = generateFallbackJobs(query, location);
-        return res.json({ 
-            success: true, 
-            jobs: fallbackJobs, 
-            total: fallbackJobs.length,
-            source: 'grok-fallback',
-            message: 'Token missing - using fallback jobs'
-        });
-    }
+    console.log(`\n🤖 Grok AI (OpenRouter) Searching: "${query}" in ${location}`);
 
     try {
-        const vercelGateway = createOpenAI({
-            apiKey: process.env.VERCEL_ACCESS_TOKEN,
-            baseURL: 'https://ai-gateway.vercel.sh/v1',
+        const response = await axios({
+            method: 'POST',
+            url: 'https://openrouter.ai/api/v1/chat/completions',
+            data: {
+                model: 'x-ai/grok-4-1-fast-non-reasoning',
+                messages: [
+                    {
+                        role: 'user',
+                        content: `Find 10 REAL ${query} jobs in ${location}, India for BBA freshers (0-2 years experience). Return ONLY a valid JSON array with: title, company, location, salary, description, applyLink. No markdown. Example: [{"title":"Digital Marketing Associate","company":"Amazon","location":"Kolkata","salary":"₹3L-5L","description":"Great role","applyLink":"#"}]`
+                    }
+                ],
+                temperature: 0.3,
+                max_tokens: 1000
+            },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+                'HTTP-Referer': 'https://job-56f5.onrender.com',
+                'X-Title': 'Kolkata Job Portal'
+            },
+            timeout: 20000
         });
-
-        const { text } = await generateText({
-            model: vercelGateway('xai/grok-4.1-fast-non-reasoning'),
-            prompt: `Find 10 REAL ${query} jobs in ${location}, India for freshers. Return ONLY a JSON array with: title, company, location, salary, description, applyLink. No markdown.`,
-            temperature: 0.2,
-        });
-
-        console.log('📝 Grok Response:', text.substring(0, 100));
 
         let jobs = [];
         try {
+            const text = response.data.choices[0].message.content;
             const jsonMatch = text.match(/\[[\s\S]*\]/);
             if (jsonMatch) {
                 jobs = JSON.parse(jsonMatch[0]);
@@ -335,7 +331,9 @@ app.get('/api/grok-jobs', async (req, res) => {
             jobs = generateFallbackJobs(query, location);
         }
 
-        if (!Array.isArray(jobs)) jobs = [];
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+            jobs = generateFallbackJobs(query, location);
+        }
 
         jobs = jobs.map(job => ({
             ...job,
@@ -350,14 +348,13 @@ app.get('/api/grok-jobs', async (req, res) => {
         res.json({ success: true, jobs, total: jobs.length });
 
     } catch (error) {
-        console.error('❌ Grok AI Error:', error.message);
+        console.error('❌ Grok AI Error:', error.response?.data || error.message);
         const fallbackJobs = generateFallbackJobs(query, location);
         res.json({ 
             success: true, 
             jobs: fallbackJobs, 
             total: fallbackJobs.length,
-            fallback: true,
-            error: error.message
+            fallback: true
         });
     }
 });
@@ -377,7 +374,7 @@ function generateFallbackJobs(query, location) {
             company: companies[i % companies.length],
             location: location,
             salary: `₹${2 + Math.floor(Math.random() * 4)}L - ₹${4 + Math.floor(Math.random() * 5)}L per annum`,
-            description: `Exciting opportunity for a ${roles[i % roles.length]} at ${companies[i % companies.length]} in ${location}. Freshers encouraged to apply. Great learning environment and career growth.`,
+            description: `Exciting opportunity for a ${roles[i % roles.length]} at ${companies[i % companies.length]} in ${location}. Freshers encouraged to apply.`,
             applyLink: '#',
             source: 'grok',
             posted: new Date().toISOString()
@@ -390,13 +387,11 @@ function generateFallbackJobs(query, location) {
 // TEST GROK ENDPOINT
 // ============================================
 app.get('/api/test-grok', (req, res) => {
-    const token = process.env.VERCEL_ACCESS_TOKEN;
     res.json({
-        tokenExists: !!token,
-        tokenLength: token ? token.length : 0,
-        message: token ? '✅ Token configured' : '❌ Token missing',
-        environment: process.env.NODE_ENV || 'development',
-        allEnvKeys: Object.keys(process.env).filter(k => k.includes('VERCEL') || k.includes('RAPID'))
+        openRouterKeyExists: !!OPENROUTER_API_KEY,
+        openRouterKeyLength: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.length : 0,
+        message: OPENROUTER_API_KEY ? '✅ OpenRouter key configured' : '❌ OpenRouter key missing',
+        grokEndpoint: 'https://openrouter.ai/api/v1/chat/completions'
     });
 });
 
@@ -495,7 +490,7 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
         timestamp: new Date().toISOString(),
-        grokConfigured: !!process.env.VERCEL_ACCESS_TOKEN,
+        grokConfigured: !!OPENROUTER_API_KEY,
         cacheSize: cache.keys().length
     });
 });
@@ -514,8 +509,8 @@ app.listen(PORT, () => {
     console.log(`   3. Active Jobs DB`);
     console.log(`   4. Indeed RSS`);
     console.log(`   5. Marketing Generator`);
-    console.log(`   6. 🤖 Grok AI`);
-    console.log(`\n🔍 Grok Status: ${process.env.VERCEL_ACCESS_TOKEN ? '✅ Configured' : '❌ Missing'}`);
+    console.log(`   6. 🤖 Grok AI (OpenRouter - FREE)`);
+    console.log(`\n🔍 Grok Status: ${OPENROUTER_API_KEY ? '✅ Configured' : '❌ Missing'}`);
     console.log(`🔍 Test Grok: http://localhost:${PORT}/api/test-grok`);
     console.log(`🔍 Search: http://localhost:${PORT}/api/jobs?query=digital+marketing&location=Kolkata\n`);
 });
