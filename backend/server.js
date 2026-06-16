@@ -34,15 +34,17 @@ function formatSalary(min, max) {
 async function fetchJSearchJobs(query, location) {
     const cacheKey = `jsearch_${query}_${location}`;
     const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        console.log(`📦 JSearch: Using cached data`);
+        return cached;
+    }
 
     try {
         const response = await axios({
             method: 'GET',
             url: 'https://jsearch.p.rapidapi.com/search',
             params: {
-                query: `${query} fresher entry level ${location}`,
-                location: location,
+                query: `${query} ${location}`,  // User types ANY job role
                 page: 1,
                 num_pages: 2,
                 radius: 50
@@ -58,25 +60,26 @@ async function fetchJSearchJobs(query, location) {
             const jobs = response.data.data
                 .filter(job => {
                     const title = (job.job_title || '').toLowerCase();
-                    return !title.includes('senior') && !title.includes('lead') && !title.includes('director') && !title.includes('manager');
+                    return !title.includes('senior') && !title.includes('lead') && !title.includes('director');
                 })
-                .slice(0, 20)
+                .slice(0, 25)
                 .map(job => ({
                     id: `jsearch_${Date.now()}_${Math.random()}`,
-                    title: job.job_title || 'Digital Marketing Role',
+                    title: job.job_title || 'Job Opportunity',
                     company: job.employer_name || 'Company',
                     location: job.job_city || job.job_location || location,
                     salary: formatSalary(job.job_min_salary, job.job_max_salary),
-                    description: (job.job_description || 'Entry-level digital marketing role for BBA freshers.').substring(0, 200),
+                    description: (job.job_description || 'Job opportunity for freshers.').substring(0, 200),
                     applyLink: job.job_apply_link || job.job_google_link || '#',
                     source: 'jsearch',
                     posted: job.job_posted_at_datetime_utc || new Date().toISOString()
                 }));
             
             cache.set(cacheKey, jobs);
-            console.log(`✅ JSearch: ${jobs.length} jobs`);
+            console.log(`✅ JSearch: ${jobs.length} jobs found for "${query}"`);
             return jobs;
         }
+        console.log(`⚠️ JSearch: No jobs found for "${query}"`);
         return [];
     } catch (error) {
         console.error(`❌ JSearch Error: ${error.message}`);
@@ -90,14 +93,17 @@ async function fetchJSearchJobs(query, location) {
 async function fetchActiveJobsDB(query, location) {
     const cacheKey = `activejobs_${query}_${location}`;
     const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        console.log(`📦 Active Jobs DB: Using cached data`);
+        return cached;
+    }
 
     try {
         const response = await axios({
             method: 'GET',
             url: 'https://active-jobs-db.p.rapidapi.com/active-joBs',
             params: {
-                query: `${query} ${location} fresher`,
+                query: `${query} ${location}`,  // User types ANY job role
                 page: 1,
                 limit: 25
             },
@@ -115,16 +121,17 @@ async function fetchActiveJobsDB(query, location) {
                 company: job.company_name || job.employer || job.company || 'Company',
                 location: job.location || job.city || job.place || location,
                 salary: job.salary_range || job.salary || job.compensation || 'Salary not disclosed',
-                description: (job.description || job.job_description || 'Entry-level digital marketing role for BBA freshers.').substring(0, 200),
+                description: (job.description || job.job_description || 'Job opportunity for freshers.').substring(0, 200),
                 applyLink: job.apply_link || job.url || job.link || '#',
                 source: 'activejobs',
                 posted: job.posted_date || job.date || new Date().toISOString()
             }));
             
             cache.set(cacheKey, jobs);
-            console.log(`✅ Active Jobs DB: ${jobs.length} jobs`);
+            console.log(`✅ Active Jobs DB: ${jobs.length} jobs found for "${query}"`);
             return jobs;
         }
+        console.log(`⚠️ Active Jobs DB: No jobs found for "${query}"`);
         return [];
     } catch (error) {
         console.error(`❌ Active Jobs DB Error: ${error.message}`);
@@ -133,20 +140,22 @@ async function fetchActiveJobsDB(query, location) {
 }
 
 // ============================================
-// SOURCE 3: JOBS SEARCH API (PR Labs - LinkedIn, Indeed, ZipRecruiter)
+// SOURCE 3: PR Labs Jobs Search API (LinkedIn, Indeed, ZipRecruiter)
 // ============================================
 async function fetchPRLabsJobs(query, location) {
     const cacheKey = `prlabs_${query}_${location}`;
     const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        console.log(`📦 PR Labs: Using cached data`);
+        return cached;
+    }
 
     try {
         const response = await axios({
             method: 'GET',
             url: 'https://jobs-search-api.p.rapidapi.com/jobs/search',
             params: {
-                query: `${query} fresher`,
-                location: location,
+                query: `${query} ${location}`,  // User types ANY job role
                 page: 1,
                 limit: 20
             },
@@ -164,16 +173,17 @@ async function fetchPRLabsJobs(query, location) {
                 company: job.company || job.employer_name || 'Company',
                 location: job.location || job.city || location,
                 salary: job.salary || job.compensation || 'Salary not disclosed',
-                description: (job.description || job.job_description || 'Fresher role in digital marketing.').substring(0, 200),
+                description: (job.description || job.job_description || 'Job opportunity for freshers.').substring(0, 200),
                 applyLink: job.url || job.apply_link || '#',
                 source: 'prlabs',
                 posted: job.posted_date || job.date || new Date().toISOString()
             }));
             
             cache.set(cacheKey, jobs);
-            console.log(`✅ PR Labs Jobs: ${jobs.length} jobs`);
+            console.log(`✅ PR Labs: ${jobs.length} jobs found for "${query}"`);
             return jobs;
         }
+        console.log(`⚠️ PR Labs: No jobs found for "${query}"`);
         return [];
     } catch (error) {
         console.error(`❌ PR Labs Error: ${error.message}`);
@@ -187,7 +197,10 @@ async function fetchPRLabsJobs(query, location) {
 async function fetchIndeedJobs(query, location) {
     const cacheKey = `indeed_${query}_${location}`;
     const cached = cache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+        console.log(`📦 Indeed: Using cached data`);
+        return cached;
+    }
 
     try {
         const rssUrl = `https://rss.indeed.com/rss?q=${encodeURIComponent(query)}&l=${encodeURIComponent(location)}&sort=date`;
@@ -212,9 +225,10 @@ async function fetchIndeedJobs(query, location) {
             });
             
             cache.set(cacheKey, jobs);
-            console.log(`✅ Indeed: ${jobs.length} jobs`);
+            console.log(`✅ Indeed: ${jobs.length} jobs found for "${query}"`);
             return jobs;
         }
+        console.log(`⚠️ Indeed: No jobs found for "${query}"`);
         return [];
     } catch (error) {
         console.error(`❌ Indeed Error: ${error.message}`);
@@ -226,37 +240,51 @@ async function fetchIndeedJobs(query, location) {
 // SOURCE 5: LinkedIn (Simulated fallback)
 // ============================================
 function getLinkedInJobs(query, location) {
-    const linkedInJobs = [
-        { title: 'Digital Marketing Associate', company: 'Tech Mahindra', salary: '₹3.5L - ₹4.5L/annum', desc: 'SEO, social media, analytics for BBA freshers.' },
-        { title: 'Social Media Executive', company: 'Wipro Digital', salary: '₹2.8L - ₹3.8L/annum', desc: 'Content creation, campaign management, analytics.' },
-        { title: 'SEO Analyst', company: 'Cognizant', salary: '₹3L - ₹4L/annum', desc: 'Keyword research, on-page optimization, SEO audits.' },
-        { title: 'Content Marketing Specialist', company: 'Infosys', salary: '₹3.2L - ₹4.2L/annum', desc: 'Content strategy, blog writing, email marketing.' },
-        { title: 'Performance Marketing Trainee', company: 'GroupM', salary: '₹2.5L - ₹3.5L/annum', desc: 'Google Ads, Facebook Ads, campaign optimization.' },
-        { title: 'Marketing Coordinator', company: 'Deloitte', salary: '₹3.5L - ₹4.5L/annum', desc: 'Coordinate marketing activities, vendor management.' },
-        { title: 'Junior Digital Marketer', company: 'Accenture', salary: '₹3L - ₹4L/annum', desc: 'Campaign management, PPC basics.' },
-        { title: 'Email Marketing Associate', company: 'Swiggy', salary: '₹3.2L - ₹4.2L/annum', desc: 'Email campaigns, automation, CRM.' },
-        { title: 'Brand Marketing Fresher', company: 'Unilever', salary: '₹4L - ₹5L/annum', desc: 'Brand strategy, campaign execution.' },
-        { title: 'Marketing Analyst', company: 'Amazon', salary: '₹3.5L - ₹4.8L/annum', desc: 'Market research, data analysis, reporting.' }
+    // Generate dynamic job titles based on user's query
+    const searchTerm = query.toLowerCase();
+    const commonRoles = [
+        `${searchTerm} Associate`,
+        `${searchTerm} Executive`,
+        `Junior ${searchTerm}`,
+        `${searchTerm} Analyst`,
+        `${searchTerm} Specialist`,
+        `Entry Level ${searchTerm}`,
+        `Fresher ${searchTerm}`,
+        `${searchTerm} Coordinator`
     ];
     
-    return linkedInJobs.map((job, index) => ({
-        id: `linkedin_${Date.now()}_${index}`,
-        title: job.title,
-        company: job.company,
-        location: location,
-        salary: job.salary,
-        description: job.desc,
-        applyLink: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(job.title)}&location=${location}`,
-        source: 'linkedin',
-        posted: new Date().toISOString()
-    }));
+    const companies = ['Tech Mahindra', 'Wipro', 'Cognizant', 'Infosys', 'Accenture', 'Deloitte', 'Amazon', 'Flipkart', 'Swiggy', 'Unilever', 'PwC', 'EY', 'KPMG', 'IBM', 'Microsoft'];
+    
+    const jobs = [];
+    for (let i = 0; i < 12; i++) {
+        const randomRole = commonRoles[i % commonRoles.length];
+        const randomCompany = companies[Math.floor(Math.random() * companies.length)];
+        jobs.push({
+            id: `linkedin_${Date.now()}_${i}`,
+            title: randomRole,
+            company: randomCompany,
+            location: location,
+            salary: `₹${2 + Math.floor(Math.random() * 4)}L - ₹${4 + Math.floor(Math.random() * 4)}L per annum`,
+            description: `Looking for a passionate ${randomRole} to join our team in ${location}. Freshers with relevant skills are encouraged to apply. Great learning opportunities and career growth.`,
+            applyLink: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(query)}&location=${location}`,
+            source: 'linkedin',
+            posted: new Date().toISOString()
+        });
+    }
+    
+    console.log(`✅ LinkedIn (Simulated): ${jobs.length} jobs generated for "${query}"`);
+    return jobs;
 }
 
 // ============================================
-// MAIN API ROUTE - Get all jobs from ALL sources
+// MAIN API ROUTE - Search ANY job role across ALL sources
 // ============================================
 app.get('/api/jobs', async (req, res) => {
-    const { query = 'digital marketing', location = 'Kolkata', source = 'all' } = req.query;
+    let { query = 'digital marketing', location = 'Kolkata', source = 'all' } = req.query;
+    
+    // Clean and prepare query
+    query = query.trim();
+    console.log(`\n🔍 SEARCHING FOR: "${query}" in ${location}`);
     
     try {
         let jobs = [];
@@ -265,16 +293,16 @@ app.get('/api/jobs', async (req, res) => {
         const promises = [];
         
         if (source === 'all' || source === 'jsearch') {
-            promises.push(fetchJSearchJobs(query, location).then(j => { jobs.push(...j); return j.length; }));
+            promises.push(fetchJSearchJobs(query, location).then(j => { jobs.push(...j); }));
         }
         if (source === 'all' || source === 'activejobs') {
-            promises.push(fetchActiveJobsDB(query, location).then(j => { jobs.push(...j); return j.length; }));
+            promises.push(fetchActiveJobsDB(query, location).then(j => { jobs.push(...j); }));
         }
         if (source === 'all' || source === 'prlabs') {
-            promises.push(fetchPRLabsJobs(query, location).then(j => { jobs.push(...j); return j.length; }));
+            promises.push(fetchPRLabsJobs(query, location).then(j => { jobs.push(...j); }));
         }
         if (source === 'all' || source === 'indeed') {
-            promises.push(fetchIndeedJobs(query, location).then(j => { jobs.push(...j); return j.length; }));
+            promises.push(fetchIndeedJobs(query, location).then(j => { jobs.push(...j); }));
         }
         if (source === 'all' || source === 'linkedin') {
             const linkedinJobs = getLinkedInJobs(query, location);
@@ -295,19 +323,21 @@ app.get('/api/jobs', async (req, res) => {
         }
         
         // Log source breakdown
-        console.log(`\n📊 JOB FETCH SUMMARY:`);
+        console.log(`\n📊 SEARCH SUMMARY for "${query}":`);
         console.log(`   JSearch: ${jobs.filter(j => j.source === 'jsearch').length}`);
         console.log(`   Active Jobs DB: ${jobs.filter(j => j.source === 'activejobs').length}`);
         console.log(`   PR Labs: ${jobs.filter(j => j.source === 'prlabs').length}`);
         console.log(`   Indeed: ${jobs.filter(j => j.source === 'indeed').length}`);
         console.log(`   LinkedIn: ${jobs.filter(j => j.source === 'linkedin').length}`);
-        console.log(`   📈 TOTAL UNIQUE: ${uniqueJobs.length} jobs\n`);
+        console.log(`   📈 TOTAL UNIQUE JOBS: ${uniqueJobs.length}\n`);
         
         res.json({
             success: true,
             total: uniqueJobs.length,
             jobs: uniqueJobs.slice(0, 100),
             timestamp: new Date().toISOString(),
+            searchQuery: query,
+            location: location,
             sources: {
                 jsearch: jobs.filter(j => j.source === 'jsearch').length,
                 activejobs: jobs.filter(j => j.source === 'activejobs').length,
@@ -333,7 +363,8 @@ app.get('/api/health', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Job Portal Backend running on port ${PORT}`);
+    console.log(`\n🚀 Job Portal Backend running on port ${PORT}`);
     console.log(`📡 API endpoint: http://localhost:${PORT}/api/jobs`);
-    console.log(`✅ APIs Integrated: JSearch | Active Jobs DB | PR Labs | Indeed | LinkedIn`);
+    console.log(`✅ Integrated APIs: JSearch | Active Jobs DB | PR Labs | Indeed | LinkedIn`);
+    console.log(`🔍 You can search ANY job role - software engineer, data analyst, graphic designer, etc.\n`);
 });
