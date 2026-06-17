@@ -15,9 +15,14 @@ app.use(express.json());
 app.use(express.static('../frontend'));
 
 // ============================================
-// OPENROUTER API KEY (Grok AI - FREE)
+// ENVIRONMENT VARIABLES (set in Render)
 // ============================================
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
+// RAPIDAPI_KEY – for JSearch, PR Labs, Active Jobs DB
+// SEARCHAPI_KEY – for real Google Jobs (you already have: sta_...)
+// ============================================
+
+// Hardcoded fallback (but better to use env var)
+const SEARCHAPI_KEY = process.env.SEARCHAPI_KEY || 'sta_93d18c53538f50a3ca8bf1009b36dbe0658cabe928ff2e39';
 
 // ============================================
 // HELPER: Format salary
@@ -37,7 +42,7 @@ function formatSalary(min, max, currency) {
 }
 
 // ============================================
-// SOURCE 1: JSearch API
+// SOURCE 1: JSearch API (Indeed/LinkedIn/Glassdoor)
 // ============================================
 async function fetchJSearchJobs(query, location) {
     const cacheKey = `jsearch_${query}_${location}`;
@@ -155,7 +160,7 @@ async function fetchPRLabsJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 3: Active Jobs DB
+// SOURCE 3: Active Jobs DB (only for tech roles)
 // ============================================
 async function fetchActiveJobsDB(query, location) {
     const cacheKey = `activejobs_${query}_${location}`;
@@ -249,7 +254,54 @@ async function fetchIndeedJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 5: Marketing Job Generator (Fallback)
+// SOURCE 5: SearchApi – REAL Google Jobs
+// ============================================
+async function fetchSearchApiJobs(query, location) {
+    const cacheKey = `searchapi_${query}_${location}`;
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+        const response = await axios.get('https://www.searchapi.io/api/v1/search', {
+            params: {
+                api_key: SEARCHAPI_KEY,
+                engine: 'google_jobs',
+                q: `${query} jobs in ${location}`,
+                gl: 'in',        // India
+                hl: 'en',
+                num: 20
+            },
+            timeout: 15000
+        });
+
+        // SearchApi returns an array under `data.jobs`
+        const jobsData = response.data?.jobs || [];
+        if (jobsData.length > 0) {
+            const jobs = jobsData.slice(0, 20).map((job, idx) => ({
+                id: `searchapi_${Date.now()}_${idx}`,
+                title: job.title || query,
+                company: job.company_name || 'Company',
+                location: job.location || location,
+                salary: job.salary || 'Not specified',
+                description: (job.description || '').substring(0, 200),
+                applyLink: job.url || '#',
+                source: 'searchapi',
+                posted: job.posted_at || new Date().toISOString()
+            }));
+            cache.set(cacheKey, jobs);
+            console.log(`✅ SearchApi: ${jobs.length} jobs`);
+            return jobs;
+        }
+        return [];
+    } catch (error) {
+        console.error(`❌ SearchApi Error: ${error.message}`);
+        // If the key fails, fall back to the marketing generator (below)
+        return [];
+    }
+}
+
+// ============================================
+// SOURCE 6: Marketing Job Generator (Fallback)
 // ============================================
 function generateMarketingJobs(query, location) {
     const marketingCompanies = [
@@ -268,7 +320,7 @@ function generateMarketingJobs(query, location) {
     ];
     
     const jobs = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 15; i++) {
         const role = marketingRoles[Math.floor(Math.random() * marketingRoles.length)];
         const company = marketingCompanies[Math.floor(Math.random() * marketingCompanies.length)];
         jobs.push({
@@ -277,7 +329,7 @@ function generateMarketingJobs(query, location) {
             company: company,
             location: location,
             salary: `₹${3 + Math.floor(Math.random() * 3)}L - ₹${5 + Math.floor(Math.random() * 4)}L per annum`,
-            description: `Exciting opportunity for a ${role} at ${company} in ${location}. Looking for creative marketing professionals with a passion for digital media and brand building. Freshers with BBA Marketing are encouraged to apply!`,
+            description: `Exciting opportunity for a ${role} at ${company} in ${location}. Freshers with BBA Marketing are encouraged to apply!`,
             applyLink: `https://www.google.com/search?q=${encodeURIComponent(role + ' jobs in ' + location)}`,
             source: 'jobs',
             posted: new Date().toISOString()
@@ -288,115 +340,28 @@ function generateMarketingJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 6: GROK AI via OpenRouter (FREE)
+// TEST SEARCHAPI ENDPOINT
 // ============================================
-app.get('/api/grok-jobs', async (req, res) => {
-    let { query = 'digital marketing', location = 'Kolkata' } = req.query;
-    
-    console.log(`\n🤖 Grok AI (OpenRouter) Searching: "${query}" in ${location}`);
-
+app.get('/api/test-searchapi', async (req, res) => {
     try {
-        const response = await axios({
-            method: 'POST',
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            data: {
-                model: 'x-ai/grok-4-1-fast-non-reasoning',
-                messages: [
-                    {
-                        role: 'user',
-                        content: `Find 10 REAL ${query} jobs in ${location}, India for BBA freshers (0-2 years experience). Return ONLY a valid JSON array with: title, company, location, salary, description, applyLink. No markdown. Example: [{"title":"Digital Marketing Associate","company":"Amazon","location":"Kolkata","salary":"₹3L-5L","description":"Great role","applyLink":"#"}]`
-                    }
-                ],
-                temperature: 0.3,
-                max_tokens: 1000
-            },
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://job-56f5.onrender.com',
-                'X-Title': 'Kolkata Job Portal'
-            },
-            timeout: 20000
-        });
-
-        let jobs = [];
-        try {
-            const text = response.data.choices[0].message.content;
-            const jsonMatch = text.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-                jobs = JSON.parse(jsonMatch[0]);
+        const response = await axios.get('https://www.searchapi.io/api/v1/search', {
+            params: {
+                api_key: SEARCHAPI_KEY,
+                engine: 'google_jobs',
+                q: 'digital marketing jobs in Kolkata',
+                gl: 'in',
+                hl: 'en',
+                num: 5
             }
-        } catch (e) {
-            console.error('Parse error:', e.message);
-            jobs = generateFallbackJobs(query, location);
-        }
-
-        if (!Array.isArray(jobs) || jobs.length === 0) {
-            jobs = generateFallbackJobs(query, location);
-        }
-
-        jobs = jobs.map(job => ({
-            ...job,
-            source: 'grok',
-            id: `grok_${Date.now()}_${Math.random()}`,
-            location: job.location || location,
-            salary: job.salary || 'Not specified',
-            applyLink: job.applyLink || '#'
-        }));
-
-        console.log(`✅ Grok AI: ${jobs.length} jobs`);
-        res.json({ success: true, jobs, total: jobs.length });
-
+        });
+        res.json({ success: true, data: response.data });
     } catch (error) {
-        console.error('❌ Grok AI Error:', error.response?.data || error.message);
-        const fallbackJobs = generateFallbackJobs(query, location);
-        res.json({ 
-            success: true, 
-            jobs: fallbackJobs, 
-            total: fallbackJobs.length,
-            fallback: true
-        });
+        res.status(500).json({ success: false, error: error.response?.data || error.message });
     }
 });
 
 // ============================================
-// FALLBACK: Generate jobs when Grok fails
-// ============================================
-function generateFallbackJobs(query, location) {
-    const companies = ['Tech Mahindra', 'Wipro', 'Cognizant', 'Infosys', 'Accenture', 'Deloitte', 'Amazon', 'Flipkart', 'Swiggy', 'Unilever'];
-    const roles = [`${query} Associate`, `Junior ${query}`, `${query} Executive`, `Fresher ${query}`, `${query} Trainee`, `${query} Specialist`];
-    
-    const jobs = [];
-    for (let i = 0; i < 8; i++) {
-        jobs.push({
-            id: `fallback_${Date.now()}_${i}`,
-            title: roles[i % roles.length],
-            company: companies[i % companies.length],
-            location: location,
-            salary: `₹${2 + Math.floor(Math.random() * 4)}L - ₹${4 + Math.floor(Math.random() * 5)}L per annum`,
-            description: `Exciting opportunity for a ${roles[i % roles.length]} at ${companies[i % companies.length]} in ${location}. Freshers encouraged to apply.`,
-            applyLink: '#',
-            source: 'grok',
-            posted: new Date().toISOString()
-        });
-    }
-    return jobs;
-}
-
-// ============================================
-// TEST GROK ENDPOINT
-// ============================================
-app.get('/api/test-grok', (req, res) => {
-    res.json({
-        openRouterKeyExists: !!OPENROUTER_API_KEY,
-        openRouterKeyLength: OPENROUTER_API_KEY ? OPENROUTER_API_KEY.length : 0,
-        message: OPENROUTER_API_KEY ? '✅ OpenRouter key configured' : '❌ OpenRouter key missing',
-        grokEndpoint: 'https://openrouter.ai/api/v1/chat/completions'
-    });
-});
-
-// ============================================
-// MAIN API ROUTE - ALL SOURCES
+// MAIN API ROUTE – ALL SOURCES
 // ============================================
 app.get('/api/jobs', async (req, res) => {
     let { query = 'digital marketing', location = 'Kolkata', source = 'all' } = req.query;
@@ -411,42 +376,31 @@ app.get('/api/jobs', async (req, res) => {
         
         const apiCalls = [];
         
+        // 1. JSearch
         if (source === 'all' || source === 'jsearch') {
             apiCalls.push(fetchJSearchJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
-        
+        // 2. PR Labs
         if (source === 'all' || source === 'prlabs') {
             apiCalls.push(fetchPRLabsJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
-        
+        // 3. Active Jobs DB
         if (source === 'all' || source === 'activejobs') {
             apiCalls.push(fetchActiveJobsDB(query, location).then(j => { if(j) jobs.push(...j); }));
         }
-        
+        // 4. Indeed RSS
         if (source === 'all' || source === 'indeed') {
             apiCalls.push(fetchIndeedJobs(query, location).then(j => { if(j) jobs.push(...j); }));
+        }
+        // 5. SearchApi (REAL Google Jobs)
+        if (source === 'all' || source === 'searchapi') {
+            apiCalls.push(fetchSearchApiJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         
         await Promise.all(apiCalls);
         
-        // GROK AI
-        if (source === 'all' || source === 'grok') {
-            try {
-                const grokRes = await axios.get(`${req.protocol}://${req.get('host')}/api/grok-jobs`, {
-                    params: { query, location },
-                    timeout: 15000
-                });
-                if (grokRes.data && grokRes.data.jobs) {
-                    jobs.push(...grokRes.data.jobs);
-                    console.log(`✅ Grok: ${grokRes.data.jobs.length} jobs`);
-                }
-            } catch (e) {
-                console.log(`⚠️ Grok skipped: ${e.message}`);
-            }
-        }
-        
-        // Marketing generator
-        if (isMarketingQuery && source === 'all') {
+        // If no jobs from real sources and it's a marketing query, add generated fallback
+        if (jobs.length === 0 && isMarketingQuery && source === 'all') {
             jobs.push(...generateMarketingJobs(query, location));
         }
         
@@ -466,7 +420,7 @@ app.get('/api/jobs', async (req, res) => {
         console.log(`   PR Labs: ${jobs.filter(j => j.source === 'prlabs').length}`);
         console.log(`   Active Jobs DB: ${jobs.filter(j => j.source === 'activejobs').length}`);
         console.log(`   Indeed: ${jobs.filter(j => j.source === 'indeed').length}`);
-        console.log(`   Grok: ${jobs.filter(j => j.source === 'grok').length}`);
+        console.log(`   SearchApi: ${jobs.filter(j => j.source === 'searchapi').length}`);
         console.log(`   Generator: ${jobs.filter(j => j.source === 'jobs').length}`);
         
         res.json({
@@ -490,7 +444,7 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'healthy', 
         timestamp: new Date().toISOString(),
-        grokConfigured: !!OPENROUTER_API_KEY,
+        searchApiConfigured: !!SEARCHAPI_KEY,
         cacheSize: cache.keys().length
     });
 });
@@ -503,14 +457,14 @@ app.listen(PORT, () => {
     console.log(`🚀 Job Portal Backend Running!`);
     console.log(`🚀 Port: ${PORT}`);
     console.log(`🚀 ========================================\n`);
-    console.log(`✅ 6 Job Sources:`);
+    console.log(`✅ Job Sources:`);
     console.log(`   1. JSearch API`);
     console.log(`   2. PR Labs API`);
     console.log(`   3. Active Jobs DB`);
     console.log(`   4. Indeed RSS`);
-    console.log(`   5. Marketing Generator`);
-    console.log(`   6. 🤖 Grok AI (OpenRouter - FREE)`);
-    console.log(`\n🔍 Grok Status: ${OPENROUTER_API_KEY ? '✅ Configured' : '❌ Missing'}`);
-    console.log(`🔍 Test Grok: http://localhost:${PORT}/api/test-grok`);
+    console.log(`   5. 🔍 SearchApi (Google Jobs – REAL)`);
+    console.log(`   6. Marketing Generator (Fallback)`);
+    console.log(`\n🔍 SearchApi Status: ${SEARCHAPI_KEY ? '✅ Key set' : '❌ Missing'}`);
+    console.log(`🔍 Test SearchApi: http://localhost:${PORT}/api/test-searchapi`);
     console.log(`🔍 Search: http://localhost:${PORT}/api/jobs?query=digital+marketing&location=Kolkata\n`);
 });
