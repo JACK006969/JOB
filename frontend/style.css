@@ -196,13 +196,11 @@ body {
     font-weight: 600;
 }
 
-/* Source badge colors */
 .source-badge.jsearch { background: #ff6b35; color: white; }
 .source-badge.activejobs { background: #9b59b6; color: white; }
 .source-badge.prlabs { background: #3498db; color: white; }
 .source-badge.indeed { background: #003d9b; color: white; }
-.source-badge.linkedin { background: #0077b5; color: white; }
-.source-badge.grok { background: #6c5ce7; color: white; }
+.source-badge.searchapi { background: #ff9800; color: white; }
 .source-badge.jobs { background: #2ecc71; color: white; }
 
 .job-title {
@@ -277,9 +275,6 @@ body {
     transform: scale(0.98);
 }
 
-/* ============================================
-   LOADING
-   ============================================ */
 .loading {
     text-align: center;
     padding: 4rem;
@@ -296,9 +291,6 @@ body {
     animation: spin 1s linear infinite;
 }
 
-/* ============================================
-   FOOTER
-   ============================================ */
 footer {
     text-align: center;
     padding: 2rem;
@@ -308,9 +300,6 @@ footer {
     margin-top: 2rem;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
 @media (max-width: 768px) {
     .container { padding: 0 1rem; }
     .header h1 { font-size: 1.8rem; }
