@@ -202,6 +202,7 @@ body {
 .source-badge.indeed { background: #003d9b; color: white; }
 .source-badge.searchapi { background: #ff9800; color: white; }
 .source-badge.jobs { background: #2ecc71; color: white; }
+.source-badge.jobdatalake { background: #e74c3c; color: white; }
 
 .job-title {
     font-size: 1.2rem;
