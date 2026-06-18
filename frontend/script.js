@@ -9,12 +9,15 @@ let currentJobs = [];
 // ============================================
 const jobsGrid = document.getElementById('jobsGrid');
 const searchBtn = document.getElementById('searchBtn');
+const aiSearchBtn = document.getElementById('aiSearchBtn');
 const searchInput = document.getElementById('searchInput');
 const locationSelect = document.getElementById('locationSelect');
-const sourceSelect = document.getElementById('sourceSelect');
 const sortSelect = document.getElementById('sortSelect');
 const jobCountSpan = document.getElementById('jobCount');
 const lastUpdateSpan = document.getElementById('lastUpdate');
+const aiSummarySection = document.getElementById('aiSummarySection');
+const aiSummaryContent = document.getElementById('aiSummaryContent');
+const closeAiBtn = document.getElementById('closeAiBtn');
 
 // ============================================
 // FETCH JOBS FROM BACKEND
@@ -22,21 +25,19 @@ const lastUpdateSpan = document.getElementById('lastUpdate');
 async function fetchJobs() {
     const query = searchInput.value.trim() || 'digital marketing';
     const location = locationSelect.value || 'Kolkata';
-    const source = sourceSelect.value || 'all';
 
     jobsGrid.innerHTML = `
         <div class="loading">
             <i class="fas fa-spinner fa-spin"></i>
-            Loading jobs from ${source === 'all' ? 'all sources' : source}...
+            Loading jobs...
         </div>
     `;
 
     try {
-        const url = `${API_URL}/jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&source=${source}`;
+        const url = `${API_URL}/jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
         console.log('📡 Fetching:', url);
 
         const response = await fetch(url);
-
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -47,8 +48,8 @@ async function fetchJobs() {
         if (data.success) {
             currentJobs = data.jobs || [];
             const total = data.total || currentJobs.length;
-
             jobCountSpan.textContent = total;
+
             const date = new Date(data.timestamp);
             lastUpdateSpan.textContent = date.toLocaleTimeString();
 
@@ -66,6 +67,57 @@ async function fetchJobs() {
                 <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: 0.5rem;">
                     Error: ${error.message}
                 </p>
+            </div>
+        `;
+    }
+}
+
+// ============================================
+// 🤖 AI SEARCH
+// ============================================
+async function fetchAIJobs() {
+    const query = searchInput.value.trim() || 'digital marketing';
+    const location = locationSelect.value || 'Kolkata';
+
+    // Show AI section
+    aiSummarySection.style.display = 'block';
+    aiSummaryContent.innerHTML = `
+        <div class="loading">
+            <i class="fas fa-spinner fa-spin"></i>
+            <h3>AI is analyzing jobs...</h3>
+            <p>This may take 10-20 seconds</p>
+        </div>
+    `;
+
+    // Scroll to AI section
+    aiSummarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+        const url = `${API_URL}/ai-jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
+        console.log('🤖 AI Fetching:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('🤖 AI Response:', data);
+
+        if (data.success) {
+            // Convert Markdown to HTML using marked.js
+            const htmlContent = marked.parse(data.ai_summary);
+            aiSummaryContent.innerHTML = htmlContent;
+        } else {
+            throw new Error(data.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('❌ AI Fetch error:', error);
+        aiSummaryContent.innerHTML = `
+            <div class="loading">
+                <i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i>
+                <h3>AI Error</h3>
+                <p>${error.message}</p>
             </div>
         `;
     }
@@ -98,7 +150,6 @@ function renderJobs() {
     }
 
     const html = jobsToRender.map(job => {
-        // SAFELY get values with fallbacks
         const source = job.source || 'unknown';
         const title = job.title || 'Job Opportunity';
         const company = job.company || 'Company';
@@ -145,11 +196,9 @@ function extractSalaryNumber(salaryStr) {
 // HELPER: Escape HTML (SAFE VERSION)
 // ============================================
 function escapeHtml(str) {
-    // If str is null, undefined, or not a string, return empty string
     if (!str || typeof str !== 'string') {
         return '';
     }
-    
     const map = {
         '&': '&amp;',
         '<': '&lt;',
@@ -164,6 +213,10 @@ function escapeHtml(str) {
 // EVENT LISTENERS
 // ============================================
 searchBtn.addEventListener('click', fetchJobs);
+aiSearchBtn.addEventListener('click', fetchAIJobs);
+closeAiBtn.addEventListener('click', () => {
+    aiSummarySection.style.display = 'none';
+});
 sortSelect.addEventListener('change', renderJobs);
 
 searchInput.addEventListener('keypress', function(e) {
