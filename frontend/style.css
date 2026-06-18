@@ -1,3 +1,6 @@
+/* ============================================
+   RESET & BASE
+   ============================================ */
 * {
     margin: 0;
     padding: 0;
@@ -8,6 +11,7 @@ body {
     font-family: 'Inter', sans-serif;
     background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
     color: #1a2c3e;
+    min-height: 100vh;
 }
 
 .container {
@@ -56,7 +60,7 @@ body {
 }
 
 .stat-card {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(10px);
     padding: 0.5rem 1.2rem;
     border-radius: 2rem;
@@ -74,7 +78,7 @@ body {
     border-radius: 1.5rem;
     padding: 1.5rem;
     margin-bottom: 2rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     border: 1px solid #e2edf2;
 }
 
@@ -181,7 +185,7 @@ body {
 
 .job-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 20px 30px -12px rgba(0,0,0,0.12);
+    box-shadow: 0 20px 30px -12px rgba(0, 0, 0, 0.12);
     border-color: #c0d8e5;
 }
 
@@ -189,20 +193,19 @@ body {
     position: absolute;
     top: 1rem;
     right: 1rem;
-    background: #f1f6fa;
     padding: 0.2rem 0.6rem;
     border-radius: 1rem;
     font-size: 0.65rem;
     font-weight: 600;
 }
 
+/* Source badge colors */
+.source-badge.jobdatalake { background: #e74c3c; color: white; }
 .source-badge.jsearch { background: #ff6b35; color: white; }
-.source-badge.activejobs { background: #9b59b6; color: white; }
 .source-badge.prlabs { background: #3498db; color: white; }
 .source-badge.indeed { background: #003d9b; color: white; }
-.source-badge.searchapi { background: #ff9800; color: white; }
 .source-badge.jobs { background: #2ecc71; color: white; }
-.source-badge.jobdatalake { background: #e74c3c; color: white; }
+.source-badge.unknown { background: #95a5a6; color: white; }
 
 .job-title {
     font-size: 1.2rem;
@@ -276,11 +279,24 @@ body {
     transform: scale(0.98);
 }
 
+/* ============================================
+   LOADING STATE
+   ============================================ */
 .loading {
     text-align: center;
     padding: 4rem;
     color: #1b5e7a;
     font-size: 1.1rem;
+}
+
+.loading h3 {
+    margin-top: 1rem;
+    font-size: 1.2rem;
+}
+
+.loading p {
+    margin-top: 0.5rem;
+    color: #7f8c8d;
 }
 
 @keyframes spin {
@@ -292,6 +308,9 @@ body {
     animation: spin 1s linear infinite;
 }
 
+/* ============================================
+   FOOTER
+   ============================================ */
 footer {
     text-align: center;
     padding: 2rem;
@@ -301,6 +320,9 @@ footer {
     margin-top: 2rem;
 }
 
+/* ============================================
+   RESPONSIVE
+   ============================================ */
 @media (max-width: 768px) {
     .container { padding: 0 1rem; }
     .header h1 { font-size: 1.8rem; }
