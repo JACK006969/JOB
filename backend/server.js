@@ -15,13 +15,10 @@ app.use(express.json());
 app.use(express.static('../frontend'));
 
 // ============================================
-// ENVIRONMENT VARIABLES
+// HARDCODED API KEYS (YOUR KEYS)
 // ============================================
-// RAPIDAPI_KEY – for JSearch, PR Labs, Active Jobs DB
-// JOBDATALAKE_KEY – for JobDataLake API (primary real source)
-// ============================================
-
-const JOBDATALAKE_KEY = process.env.JOBDATALAKE_KEY || 'jdl_3e4d08cc69dab0040b28af5f3daba8be1f45f8ffc0f19281';
+const JOBDATALAKE_KEY = 'jdl_3e4d08cc69dab0040b28af5f3daba8be1f45f8ffc0f19281';
+const RAPIDAPI_KEY = '99c293cf43mshd7968eedbb0a14cp1d0d7ajsn1dbebbcc0307';
 
 // Helper: format salary
 function formatSalary(min, max, currency) {
@@ -56,13 +53,12 @@ async function fetchJobDataLakeJobs(query, location) {
                 limit: 30
             },
             headers: {
-                'Authorization': `Bearer ${JOBDATALAKE_KEY}`,
+                'X-API-Key': JOBDATALAKE_KEY,  // ← CORRECT HEADER
                 'Content-Type': 'application/json'
             },
             timeout: 15000
         });
 
-        // Handle different response structures
         let jobsData = [];
         if (response.data?.jobs) jobsData = response.data.jobs;
         else if (response.data?.data) jobsData = response.data.data;
@@ -114,7 +110,7 @@ async function fetchJSearchJobs(query, location) {
                 num_pages: 2
             },
             headers: {
-                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
                 'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
             },
             timeout: 10000
@@ -174,7 +170,7 @@ async function fetchPRLabsJobs(query, location) {
             },
             headers: {
                 'Content-Type': 'application/json',
-                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
+                'X-RapidAPI-Key': RAPIDAPI_KEY,
                 'X-RapidAPI-Host': 'jobs-search-api.p.rapidapi.com'
             },
             timeout: 15000
@@ -215,62 +211,7 @@ async function fetchPRLabsJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 4: Active Jobs DB (TECH ROLES ONLY)
-// ============================================
-async function fetchActiveJobsDB(query, location) {
-    const cacheKey = `activejobs_${query}_${location}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
-
-    const marketingKeywords = ['marketing', 'digital marketing', 'social media', 'content', 'seo', 'brand'];
-    const isMarketingQuery = marketingKeywords.some(kw => query.toLowerCase().includes(kw));
-    
-    if (isMarketingQuery) {
-        console.log(`⚠️ Active Jobs DB: Skipping - No marketing jobs`);
-        return [];
-    }
-
-    try {
-        const response = await axios({
-            method: 'GET',
-            url: 'https://active-jobs-db.p.rapidapi.com/jobs',
-            params: {
-                title: query,
-                location: location,
-                limit: 25
-            },
-            headers: {
-                'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-                'X-RapidAPI-Host': 'active-jobs-db.p.rapidapi.com'
-            },
-            timeout: 10000
-        });
-
-        if (response.data && response.data.length > 0) {
-            const jobs = response.data.slice(0, 25).map(job => ({
-                id: `activejobs_${job.id || Date.now()}_${Math.random()}`,
-                title: job.title || query,
-                company: job.organization || 'Company',
-                location: job.locations_derived?.[0] || job.locations?.[0]?.address?.addressLocality || location,
-                salary: job.ai_salary_min_value ? formatSalary(job.ai_salary_min_value, job.ai_salary_max_value, job.ai_salary_currency) : 'Salary not disclosed',
-                description: (job.description_text || job.ai_core_responsibilities || '').substring(0, 200),
-                applyLink: job.url || '#',
-                source: 'activejobs',
-                posted: job.date_posted || new Date().toISOString()
-            }));
-            cache.set(cacheKey, jobs);
-            console.log(`✅ Active Jobs DB: ${jobs.length} jobs`);
-            return jobs;
-        }
-        return [];
-    } catch (error) {
-        console.error(`❌ Active Jobs DB Error: ${error.message}`);
-        return [];
-    }
-}
-
-// ============================================
-// SOURCE 5: Indeed RSS (FREE FALLBACK)
+// SOURCE 4: Indeed RSS (FREE FALLBACK)
 // ============================================
 async function fetchIndeedJobs(query, location) {
     const cacheKey = `indeed_${query}_${location}`;
@@ -309,45 +250,6 @@ async function fetchIndeedJobs(query, location) {
 }
 
 // ============================================
-// SOURCE 6: MARKETING GENERATOR (LAST RESORT)
-// ============================================
-function generateMarketingJobs(query, location) {
-    const marketingCompanies = [
-        'Publicis Groupe', 'Ogilvy', 'DDB Mudra', 'FCB Interface', 'McCann Worldgroup',
-        'Wunderman Thompson', 'Havas Group', 'Leo Burnett', 'Grey Group', 'IPG Mediabrands',
-        'Amazon India', 'Flipkart', 'Myntra', 'Nykaa', 'Meesho', 'Paytm', 'Zomato', 'Swiggy',
-        'Unilever', 'P&G', 'Nestle', 'Coca-Cola', 'PepsiCo', 'Tata Motors', 'Reliance Digital'
-    ];
-    
-    const marketingRoles = [
-        'Digital Marketing Associate', 'SEO Executive', 'Social Media Manager', 
-        'Content Marketing Specialist', 'Email Marketing Executive', 'PPC Analyst',
-        'Marketing Coordinator', 'Brand Executive', 'Performance Marketing Trainee',
-        'Marketing Analyst', 'Growth Hacker', 'Influencer Marketing Associate',
-        'CRM Executive', 'Marketing Communications Associate'
-    ];
-    
-    const jobs = [];
-    for (let i = 0; i < 15; i++) {
-        const role = marketingRoles[Math.floor(Math.random() * marketingRoles.length)];
-        const company = marketingCompanies[Math.floor(Math.random() * marketingCompanies.length)];
-        jobs.push({
-            id: `marketing_${Date.now()}_${i}`,
-            title: role,
-            company: company,
-            location: location,
-            salary: `₹${3 + Math.floor(Math.random() * 3)}L - ₹${5 + Math.floor(Math.random() * 4)}L per annum`,
-            description: `Exciting opportunity for a ${role} at ${company} in ${location}. Freshers with BBA Marketing are encouraged to apply!`,
-            applyLink: `https://www.google.com/search?q=${encodeURIComponent(role + ' jobs in ' + location)}`,
-            source: 'jobs',
-            posted: new Date().toISOString()
-        });
-    }
-    console.log(`✅ Marketing Generator: ${jobs.length} jobs`);
-    return jobs;
-}
-
-// ============================================
 // TEST JOBDATALAKE ENDPOINT
 // ============================================
 app.get('/api/test-jobdatalake', async (req, res) => {
@@ -361,7 +263,7 @@ app.get('/api/test-jobdatalake', async (req, res) => {
                 limit: 5
             },
             headers: {
-                'Authorization': `Bearer ${JOBDATALAKE_KEY}`,
+                'X-API-Key': JOBDATALAKE_KEY,
                 'Content-Type': 'application/json'
             },
             timeout: 10000
@@ -391,8 +293,6 @@ app.get('/api/jobs', async (req, res) => {
     
     try {
         let jobs = [];
-        const isMarketingQuery = ['marketing', 'digital', 'social media', 'seo', 'content', 'brand', 'ppc', 'email marketing']
-            .some(kw => query.toLowerCase().includes(kw));
         
         const apiCalls = [];
         
@@ -411,22 +311,12 @@ app.get('/api/jobs', async (req, res) => {
             apiCalls.push(fetchPRLabsJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         
-        // 4. Active Jobs DB
-        if (source === 'all' || source === 'activejobs') {
-            apiCalls.push(fetchActiveJobsDB(query, location).then(j => { if(j) jobs.push(...j); }));
-        }
-        
-        // 5. Indeed RSS
+        // 4. Indeed RSS
         if (source === 'all' || source === 'indeed') {
             apiCalls.push(fetchIndeedJobs(query, location).then(j => { if(j) jobs.push(...j); }));
         }
         
         await Promise.all(apiCalls);
-        
-        // Fallback generator if no jobs found
-        if (jobs.length === 0 && isMarketingQuery && source === 'all') {
-            jobs.push(...generateMarketingJobs(query, location));
-        }
         
         // Remove duplicates
         const uniqueJobs = [];
@@ -443,9 +333,7 @@ app.get('/api/jobs', async (req, res) => {
         console.log(`   JobDataLake: ${jobs.filter(j => j.source === 'jobdatalake').length}`);
         console.log(`   JSearch: ${jobs.filter(j => j.source === 'jsearch').length}`);
         console.log(`   PR Labs: ${jobs.filter(j => j.source === 'prlabs').length}`);
-        console.log(`   Active Jobs DB: ${jobs.filter(j => j.source === 'activejobs').length}`);
         console.log(`   Indeed: ${jobs.filter(j => j.source === 'indeed').length}`);
-        console.log(`   Generator: ${jobs.filter(j => j.source === 'jobs').length}`);
         
         res.json({
             success: true,
@@ -485,9 +373,7 @@ app.listen(PORT, () => {
     console.log(`   1. 🔥 JobDataLake (PRIMARY - REAL JOBS)`);
     console.log(`   2. JSearch API (BACKUP - REAL JOBS)`);
     console.log(`   3. PR Labs API (BACKUP - REAL JOBS)`);
-    console.log(`   4. Active Jobs DB (TECH ROLES)`);
-    console.log(`   5. Indeed RSS (FREE FALLBACK)`);
-    console.log(`   6. Marketing Generator (LAST RESORT)`);
+    console.log(`   4. Indeed RSS (FREE FALLBACK)`);
     console.log(`\n🔍 JobDataLake Status: ${JOBDATALAKE_KEY ? '✅ Key set' : '❌ Missing'}`);
     console.log(`🔍 Test: http://localhost:${PORT}/api/test-jobdatalake`);
     console.log(`🔍 Search: http://localhost:${PORT}/api/jobs?query=digital+marketing&location=Kolkata\n`);
