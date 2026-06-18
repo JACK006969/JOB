@@ -3,13 +3,14 @@ const cors = require('cors');
 const axios = require('axios');
 const NodeCache = require('node-cache');
 const OpenAI = require('openai');
+const path = require('path');  // ← ADD THIS LINE
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const cache = new NodeCache({ stdTTL: 1800 }); // 30 min cache
+const cache = new NodeCache({ stdTTL: 1800 });
 
-// Initialize Groq client (uses GROQ_API_KEY from Render environment variables)
+// Initialize Groq client
 const groqClient = new OpenAI({
     apiKey: process.env.GROQ_API_KEY,
     baseURL: "https://api.groq.com/openai/v1"
@@ -17,8 +18,7 @@ const groqClient = new OpenAI({
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('../frontend'));
-
+app.use(express.static(path.join(__dirname, '../frontend')));  // ← FIXED PATH
 // ============================================
 // API KEYS
 // ============================================
