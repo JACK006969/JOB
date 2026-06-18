@@ -1,7 +1,7 @@
 // ============================================
 // API CONFIGURATION
 // ============================================
-const API_URL = '/api';  // ✅ CORRECT - uses same domain as backend
+const API_URL = '/api';
 let currentJobs = [];
 
 // ============================================
@@ -23,37 +23,35 @@ async function fetchJobs() {
     const query = searchInput.value.trim() || 'digital marketing';
     const location = locationSelect.value || 'Kolkata';
     const source = sourceSelect.value || 'all';
-    
-    // Show loading state
+
     jobsGrid.innerHTML = `
         <div class="loading">
-            <i class="fas fa-spinner fa-spin"></i> 
+            <i class="fas fa-spinner fa-spin"></i>
             Loading jobs from ${source === 'all' ? 'all sources' : source}...
         </div>
     `;
-    
+
     try {
         const url = `${API_URL}/jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}&source=${source}`;
         console.log('📡 Fetching:', url);
-        
+
         const response = await fetch(url);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         console.log('📊 Response:', data);
-        
+
         if (data.success) {
             currentJobs = data.jobs || [];
             const total = data.total || currentJobs.length;
-            
-            // Update stats
+
             jobCountSpan.textContent = total;
             const date = new Date(data.timestamp);
             lastUpdateSpan.textContent = date.toLocaleTimeString();
-            
+
             renderJobs();
         } else {
             throw new Error(data.error || 'Unknown error');
@@ -74,7 +72,7 @@ async function fetchJobs() {
 }
 
 // ============================================
-// RENDER JOBS TO GRID
+// RENDER JOBS
 // ============================================
 function renderJobs() {
     if (!currentJobs || currentJobs.length === 0) {
@@ -87,10 +85,9 @@ function renderJobs() {
         `;
         return;
     }
-    
+
     let jobsToRender = [...currentJobs];
-    
-    // Apply sorting
+
     const sortBy = sortSelect.value;
     if (sortBy === 'salary') {
         jobsToRender.sort((a, b) => {
@@ -99,14 +96,13 @@ function renderJobs() {
             return salaryB - salaryA;
         });
     }
-    
-    // Build HTML
+
     const html = jobsToRender.map(job => `
         <div class="job-card">
             <div class="source-badge ${job.source || 'unknown'}">${(job.source || 'unknown').toUpperCase()}</div>
             <div class="job-title">${escapeHtml(job.title || 'Job Opportunity')}</div>
             <div class="company">
-                <i class="fas fa-building"></i> 
+                <i class="fas fa-building"></i>
                 ${escapeHtml(job.company || 'Company')}
             </div>
             <div class="details">
@@ -120,12 +116,12 @@ function renderJobs() {
             </a>
         </div>
     `).join('');
-    
+
     jobsGrid.innerHTML = html;
 }
 
 // ============================================
-// HELPER: Extract salary number for sorting
+// HELPER FUNCTIONS
 // ============================================
 function extractSalaryNumber(salaryStr) {
     if (!salaryStr) return 0;
@@ -134,9 +130,6 @@ function extractSalaryNumber(salaryStr) {
     return Math.max(...numbers.map(Number));
 }
 
-// ============================================
-// HELPER: Escape HTML
-// ============================================
 function escapeHtml(str) {
     if (!str) return '';
     const map = {
@@ -155,7 +148,6 @@ function escapeHtml(str) {
 searchBtn.addEventListener('click', fetchJobs);
 sortSelect.addEventListener('change', renderJobs);
 
-// Enter key on search input
 searchInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
         fetchJobs();
@@ -163,7 +155,7 @@ searchInput.addEventListener('keypress', function(e) {
 });
 
 // ============================================
-// AUTO-LOAD JOBS ON PAGE LOAD
+// LOAD ON PAGE OPEN
 // ============================================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🚀 Job Portal Frontend Loaded');
@@ -172,9 +164,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
-// REFRESH JOBS EVERY 5 MINUTES (AUTO-UPDATE)
+// AUTO-REFRESH EVERY 5 MINUTES
 // ============================================
 setInterval(() => {
     console.log('🔄 Auto-refreshing jobs...');
     fetchJobs();
-}, 300000); // 5 minutes
+}, 300000);
