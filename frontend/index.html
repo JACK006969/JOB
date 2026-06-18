@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kolkata Job Portal | 50+ Fresher Jobs</title>
+    <title>Kolkata Job Portal | Fresher Jobs</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
+    <!-- ============================================ -->
+    <!-- HEADER -->
+    <!-- ============================================ -->
     <div class="header">
         <div class="container">
             <h1><i class="fas fa-briefcase"></i> Kolkata Job Portal</h1>
-            <p>50+ fresher jobs for BBA Digital Marketing graduates</p>
+            <p>Real fresher jobs for BBA Digital Marketing graduates</p>
             <div class="stats-row">
                 <div class="stat-card"><i class="fas fa-building"></i> 50+ Companies</div>
                 <div class="stat-card"><i class="fas fa-rupee-sign"></i> Fresher Friendly</div>
@@ -22,10 +25,14 @@
         </div>
     </div>
 
+    <!-- ============================================ -->
+    <!-- MAIN CONTENT -->
+    <!-- ============================================ -->
     <div class="container">
+        <!-- Controls Bar -->
         <div class="controls-bar">
             <div class="search-section">
-                <input type="text" id="searchInput" placeholder="Search any job... (e.g., software engineer, data analyst, marketing)" value="digital marketing">
+                <input type="text" id="searchInput" placeholder="Search any job... (e.g., digital marketing, software engineer)" value="digital marketing">
                 <select id="locationSelect">
                     <option value="Kolkata">Kolkata</option>
                     <option value="Bangalore">Bangalore</option>
@@ -60,6 +67,7 @@
             </div>
         </div>
 
+        <!-- Jobs Grid -->
         <div class="jobs-grid" id="jobsGrid">
             <div class="loading">
                 <i class="fas fa-spinner fa-spin"></i> Loading jobs from JobDataLake, JSearch, PR Labs & Indeed...
@@ -67,6 +75,9 @@
         </div>
     </div>
 
+    <!-- ============================================ -->
+    <!-- FOOTER -->
+    <!-- ============================================ -->
     <footer>
         <p>Powered by JobDataLake, JSearch, PR Labs & Indeed RSS | Backend: Node.js | Deploy on Render</p>
     </footer>
