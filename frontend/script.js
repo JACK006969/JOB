@@ -97,41 +97,59 @@ function renderJobs() {
         });
     }
 
-    const html = jobsToRender.map(job => `
-        <div class="job-card">
-            <div class="source-badge ${job.source || 'unknown'}">${(job.source || 'unknown').toUpperCase()}</div>
-            <div class="job-title">${escapeHtml(job.title || 'Job Opportunity')}</div>
-            <div class="company">
-                <i class="fas fa-building"></i>
-                ${escapeHtml(job.company || 'Company')}
+    const html = jobsToRender.map(job => {
+        // SAFELY get values with fallbacks
+        const source = job.source || 'unknown';
+        const title = job.title || 'Job Opportunity';
+        const company = job.company || 'Company';
+        const location = job.location || 'Not specified';
+        const salary = job.salary || 'Not specified';
+        const description = job.description || '';
+        const applyLink = job.applyLink || '#';
+
+        return `
+            <div class="job-card">
+                <div class="source-badge ${source}">${source.toUpperCase()}</div>
+                <div class="job-title">${escapeHtml(title)}</div>
+                <div class="company">
+                    <i class="fas fa-building"></i>
+                    ${escapeHtml(company)}
+                </div>
+                <div class="details">
+                    <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(location)}</span>
+                    <span class="salary-badge"><i class="fas fa-wallet"></i> ${escapeHtml(salary)}</span>
+                    <span><i class="fas fa-briefcase"></i> Full-time</span>
+                </div>
+                <div class="desc">${escapeHtml(description.substring(0, 200))}...</div>
+                <a href="${applyLink}" target="_blank" rel="noopener noreferrer" class="apply-btn">
+                    <i class="fas fa-paper-plane"></i> Apply Now →
+                </a>
             </div>
-            <div class="details">
-                <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(job.location || 'Not specified')}</span>
-                <span class="salary-badge"><i class="fas fa-wallet"></i> ${escapeHtml(job.salary || 'Not specified')}</span>
-                <span><i class="fas fa-briefcase"></i> Full-time</span>
-            </div>
-            <div class="desc">${escapeHtml((job.description || '').substring(0, 200))}...</div>
-            <a href="${job.applyLink || '#'}" target="_blank" rel="noopener noreferrer" class="apply-btn">
-                <i class="fas fa-paper-plane"></i> Apply Now →
-            </a>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
     jobsGrid.innerHTML = html;
 }
 
 // ============================================
-// HELPER FUNCTIONS
+// HELPER: Extract salary number
 // ============================================
 function extractSalaryNumber(salaryStr) {
-    if (!salaryStr) return 0;
+    if (!salaryStr || typeof salaryStr !== 'string') return 0;
     const numbers = salaryStr.match(/\d+(?:\.\d+)?/g);
     if (!numbers) return 0;
     return Math.max(...numbers.map(Number));
 }
 
+// ============================================
+// HELPER: Escape HTML (SAFE VERSION)
+// ============================================
 function escapeHtml(str) {
-    if (!str) return '';
+    // If str is null, undefined, or not a string, return empty string
+    if (!str || typeof str !== 'string') {
+        return '';
+    }
+    
     const map = {
         '&': '&amp;',
         '<': '&lt;',
