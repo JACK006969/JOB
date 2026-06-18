@@ -3,26 +3,34 @@ const cors = require('cors');
 const axios = require('axios');
 const NodeCache = require('node-cache');
 const OpenAI = require('openai');
-const path = require('path');  // ← ADD THIS LINE
+const path = require('path'); // Required for fixing the CSS path
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const cache = new NodeCache({ stdTTL: 1800 });
+const cache = new NodeCache({ stdTTL: 1800 }); // 30 min cache
 
-// Initialize Groq client
+// ============================================
+// GROQ AI CLIENT INITIALIZATION
+// ============================================
 const groqClient = new OpenAI({
     apiKey: process.env.GROQ_API_KEY,
     baseURL: "https://api.groq.com/openai/v1"
 });
 
+// ============================================
+// MIDDLEWARE
+// ============================================
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));  // ← FIXED PATH
+
+// CRITICAL FIX: This line makes your CSS and frontend load correctly on Render
+app.use(express.static(path.join(__dirname, '../frontend')));
+
 // ============================================
 // API KEYS
 // ============================================
-const RAPIDAPI_KEY = '99c293cf43mshd7968eedbb0a14cp1d0d7ajsn1dbebbcc0307';
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY; 
 
 // Helper: format salary
 function formatSalary(min, max, currency) {
@@ -76,7 +84,7 @@ async function fetchJSearchJobs(query, location) {
                 posted: job.job_posted_at_datetime_utc || new Date().toISOString()
             }));
             cache.set(cacheKey, jobs);
-            console.log(`✅ JSearch: ${jobs.length} jobs`);
+            console.log(`✅ JSearch: ${jobs.length} jobs found`);
             return jobs;
         }
         return [];
@@ -97,7 +105,7 @@ app.get('/api/jobs', async (req, res) => {
     try {
         const jobs = await fetchJSearchJobs(query, location);
         
-        console.log(`📊 TOTAL: ${jobs.length} jobs from JSearch`);
+        console.log(` TOTAL: ${jobs.length} jobs from JSearch`);
 
         res.json({
             success: true,
@@ -114,7 +122,7 @@ app.get('/api/jobs', async (req, res) => {
 });
 
 // ============================================
-// 🤖 AI JOBS ROUTE (Powered by Groq + Qwen)
+// 🤖 AI JOBS ROUTE (Powered by Groq + Qwen 3.6)
 // ============================================
 app.get('/api/ai-jobs', async (req, res) => {
     let { query = 'digital marketing', location = 'Kolkata' } = req.query;
@@ -131,7 +139,7 @@ app.get('/api/ai-jobs', async (req, res) => {
             });
         }
 
-        // Take top 15 jobs to keep it fast
+        // Take top 15 jobs to keep it fast and save tokens
         const topJobs = jobs.slice(0, 15);
 
         // 2. Send to Groq (Qwen) to format and summarize
@@ -150,15 +158,19 @@ Format everything in clean Markdown.
 Here are the jobs:
 ${JSON.stringify(topJobs, null, 2)}`;
 
+        console.log('🚀 Calling Groq API with qwen/qwen3.6-27b...');
+        
         const completion = await groqClient.chat.completions.create({
-            model: "qwen-2.5-32b",
+            model: "qwen/qwen3.6-27b", // THE NEW WORKING MODEL!
             messages: [
                 { role: "user", content: prompt }
             ],
-            temperature: 0.7,
-            max_tokens: 2048
+            temperature: 0.6,
+            max_tokens: 4096,
+            top_p: 0.95
         });
 
+        console.log('✅ Groq responded successfully!');
         const aiResponse = completion.choices[0].message.content;
 
         res.json({
@@ -169,10 +181,38 @@ ${JSON.stringify(topJobs, null, 2)}`;
         });
 
     } catch (error) {
-        console.error('❌ AI Error:', error);
+        console.error('❌ AI Error Details:', error);
         res.status(500).json({ 
             success: false, 
             error: error.message 
+        });
+    }
+});
+
+// ============================================
+// 🧪 TEST GROQ ROUTE (To verify connection)
+// ============================================
+app.get('/api/test-groq', async (req, res) => {
+    console.log('🧪 Testing Groq connection...');
+    try {
+        const testResponse = await groqClient.chat.completions.create({
+            model: "qwen/qwen3.6-27b",
+            messages: [
+                { role: "user", content: "Say 'Hello, Groq and Qwen are working perfectly!' in one sentence" }
+            ],
+            max_tokens: 50
+        });
+        
+        res.json({
+            success: true,
+            message: testResponse.choices[0].message.content,
+            groqConfigured: !!process.env.GROQ_API_KEY
+        });
+    } catch (error) {
+        res.json({
+            success: false,
+            error: error.message,
+            groqConfigured: !!process.env.GROQ_API_KEY
         });
     }
 });
@@ -185,7 +225,8 @@ app.get('/api/health', (req, res) => {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         cacheSize: cache.keys().length,
-        groqConfigured: !!process.env.GROQ_API_KEY
+        groqConfigured: !!process.env.GROQ_API_KEY,
+        rapidApiConfigured: !!RAPIDAPI_KEY
     });
 });
 
@@ -195,6 +236,8 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
     console.log(`\n🚀 Server running on port ${PORT}`);
     console.log(`✅ Groq AI: ${process.env.GROQ_API_KEY ? 'Configured' : 'Missing GROQ_API_KEY'}`);
-    console.log(`🔍 Test: http://localhost:${PORT}/api/jobs?query=python&location=remote`);
-    console.log(`🤖 AI Test: http://localhost:${PORT}/api/ai-jobs?query=python&location=remote`);
+    console.log(`✅ RapidAPI: ${RAPIDAPI_KEY ? 'Configured' : 'Missing RAPIDAPI_KEY'}`);
+    console.log(`🔍 Test Jobs: http://localhost:${PORT}/api/jobs?query=python&location=remote`);
+    console.log(`🤖 Test AI: http://localhost:${PORT}/api/ai-jobs?query=python&location=remote`);
+    console.log(`🧪 Test Groq: http://localhost:${PORT}/api/test-groq`);
 });
