@@ -1,243 +1,106 @@
-// ============================================
-// API CONFIGURATION
-// ============================================
 const API_URL = '/api';
-let currentJobs = [];
+let currentPage = 1;
+let currentQuery = 'Digital Marketing';
+let currentLocation = 'Kolkata';
 
-// ============================================
-// DOM ELEMENTS
-// ============================================
 const jobsGrid = document.getElementById('jobsGrid');
 const searchBtn = document.getElementById('searchBtn');
 const aiSearchBtn = document.getElementById('aiSearchBtn');
 const searchInput = document.getElementById('searchInput');
-const locationSelect = document.getElementById('locationSelect');
-const sortSelect = document.getElementById('sortSelect');
-const jobCountSpan = document.getElementById('jobCount');
-const lastUpdateSpan = document.getElementById('lastUpdate');
+const locationInput = document.getElementById('locationInput');
 const aiSummarySection = document.getElementById('aiSummarySection');
 const aiSummaryContent = document.getElementById('aiSummaryContent');
 const closeAiBtn = document.getElementById('closeAiBtn');
 
-// ============================================
-// FETCH JOBS FROM BACKEND
-// ============================================
+// Filters
+const jobTypeFilter = document.getElementById('jobTypeFilter');
+const remoteFilter = document.getElementById('remoteFilter');
+const experienceFilter = document.getElementById('experienceFilter');
+
+// Pagination
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const pageInfo = document.getElementById('pageInfo');
+
 async function fetchJobs() {
-    const query = searchInput.value.trim() || 'digital marketing';
-    const location = locationSelect.value || 'Kolkata';
+    currentQuery = searchInput.value.trim() || 'Digital Marketing';
+    currentLocation = locationInput.value.trim() || 'Kolkata';
+    
+    const jobType = jobTypeFilter.value;
+    const remote = remoteFilter.value;
+    const experience = experienceFilter.value;
 
-    jobsGrid.innerHTML = `
-        <div class="loading">
-            <i class="fas fa-spinner fa-spin"></i>
-            Loading jobs...
-        </div>
-    `;
+    jobsGrid.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>`;
 
     try {
-        const url = `${API_URL}/jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
-        console.log('📡 Fetching:', url);
-
+        const url = `${API_URL}/jobs?query=${encodeURIComponent(currentQuery)}&location=${encodeURIComponent(currentLocation)}&page=${currentPage}&job_type=${jobType}&remote=${remote}&experience=${experience}`;
+        
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
-        console.log('📊 Response:', data);
 
-        if (data.success) {
-            currentJobs = data.jobs || [];
-            const total = data.total || currentJobs.length;
-            jobCountSpan.textContent = total;
-
-            const date = new Date(data.timestamp);
-            lastUpdateSpan.textContent = date.toLocaleTimeString();
-
-            renderJobs();
+        if (data.success && data.jobs.length > 0) {
+            renderJobs(data.jobs);
+            updatePagination();
         } else {
-            throw new Error(data.error || 'Unknown error');
+            jobsGrid.innerHTML = `<div class="loading"><i class="fas fa-search"></i><h3>No jobs found</h3><p>Try changing filters or keywords.</p></div>`;
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
         }
     } catch (error) {
-        console.error('❌ Fetch error:', error);
-        jobsGrid.innerHTML = `
-            <div class="loading">
-                <i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i>
-                <h3>Cannot connect to backend</h3>
-                <p>Please make sure the backend server is running.</p>
-                <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: 0.5rem;">
-                    Error: ${error.message}
-                </p>
-            </div>
-        `;
+        jobsGrid.innerHTML = `<div class="loading"><i class="fas fa-exclamation-triangle"></i><h3>Error loading jobs</h3></div>`;
     }
 }
 
-// ============================================
-// 🤖 AI SEARCH
-// ============================================
+function renderJobs(jobs) {
+    jobsGrid.innerHTML = jobs.map(job => `
+        <div class="job-card">
+            <div class="source-badge jsearch">${job.jobType || 'Full-time'}</div>
+            <div class="job-title">${job.title}</div>
+            <div class="company"><i class="fas fa-building"></i> ${job.company}</div>
+            <div class="details">
+                <span><i class="fas fa-map-marker-alt"></i> ${job.location}</span>
+                <span class="salary-badge"><i class="fas fa-wallet"></i> ${job.salary}</span>
+            </div>
+            <div class="desc">${job.description}...</div>
+            <a href="${job.applyLink}" target="_blank" class="apply-btn"><i class="fas fa-paper-plane"></i> Apply Now</a>
+        </div>
+    `).join('');
+}
+
+function updatePagination() {
+    pageInfo.textContent = `Page ${currentPage}`;
+    prevBtn.disabled = currentPage === 1;
+    // JSearch usually has max 10-20 pages. We enable next by default unless empty.
+    nextBtn.disabled = false; 
+}
+
 async function fetchAIJobs() {
-    const query = searchInput.value.trim() || 'digital marketing';
-    const location = locationSelect.value || 'Kolkata';
-
-    // Show AI section
     aiSummarySection.style.display = 'block';
-    aiSummaryContent.innerHTML = `
-        <div class="loading">
-            <i class="fas fa-spinner fa-spin"></i>
-            <h3>AI is analyzing jobs...</h3>
-            <p>This may take 10-20 seconds</p>
-        </div>
-    `;
-
-    // Scroll to AI section
-    aiSummarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    aiSummaryContent.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i> AI is thinking...</div>`;
+    aiSummarySection.scrollIntoView({ behavior: 'smooth' });
 
     try {
-        const url = `${API_URL}/ai-jobs?query=${encodeURIComponent(query)}&location=${encodeURIComponent(location)}`;
-        console.log('🤖 AI Fetching:', url);
-
+        const url = `${API_URL}/ai-jobs?query=${encodeURIComponent(currentQuery)}&location=${encodeURIComponent(currentLocation)}`;
         const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
-        console.log('🤖 AI Response:', data);
-
         if (data.success) {
-            // Convert Markdown to HTML using marked.js
-            const htmlContent = marked.parse(data.ai_summary);
-            aiSummaryContent.innerHTML = htmlContent;
-        } else {
-            throw new Error(data.error || 'Unknown error');
+            aiSummaryContent.innerHTML = marked.parse(data.ai_summary);
         }
     } catch (error) {
-        console.error('❌ AI Fetch error:', error);
-        aiSummaryContent.innerHTML = `
-            <div class="loading">
-                <i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i>
-                <h3>AI Error</h3>
-                <p>${error.message}</p>
-            </div>
-        `;
+        aiSummaryContent.innerHTML = `<p>Error: ${error.message}</p>`;
     }
 }
 
-// ============================================
-// RENDER JOBS
-// ============================================
-function renderJobs() {
-    if (!currentJobs || currentJobs.length === 0) {
-        jobsGrid.innerHTML = `
-            <div class="loading">
-                <i class="fas fa-search" style="color: #1b5e7a;"></i>
-                <h3>No jobs found</h3>
-                <p>Try different search terms or location.</p>
-            </div>
-        `;
-        return;
-    }
-
-    let jobsToRender = [...currentJobs];
-
-    const sortBy = sortSelect.value;
-    if (sortBy === 'salary') {
-        jobsToRender.sort((a, b) => {
-            const salaryA = extractSalaryNumber(a.salary);
-            const salaryB = extractSalaryNumber(b.salary);
-            return salaryB - salaryA;
-        });
-    }
-
-    const html = jobsToRender.map(job => {
-        const source = job.source || 'unknown';
-        const title = job.title || 'Job Opportunity';
-        const company = job.company || 'Company';
-        const location = job.location || 'Not specified';
-        const salary = job.salary || 'Not specified';
-        const description = job.description || '';
-        const applyLink = job.applyLink || '#';
-
-        return `
-            <div class="job-card">
-                <div class="source-badge ${source}">${source.toUpperCase()}</div>
-                <div class="job-title">${escapeHtml(title)}</div>
-                <div class="company">
-                    <i class="fas fa-building"></i>
-                    ${escapeHtml(company)}
-                </div>
-                <div class="details">
-                    <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(location)}</span>
-                    <span class="salary-badge"><i class="fas fa-wallet"></i> ${escapeHtml(salary)}</span>
-                    <span><i class="fas fa-briefcase"></i> Full-time</span>
-                </div>
-                <div class="desc">${escapeHtml(description.substring(0, 200))}...</div>
-                <a href="${applyLink}" target="_blank" rel="noopener noreferrer" class="apply-btn">
-                    <i class="fas fa-paper-plane"></i> Apply Now →
-                </a>
-            </div>
-        `;
-    }).join('');
-
-    jobsGrid.innerHTML = html;
-}
-
-// ============================================
-// HELPER: Extract salary number
-// ============================================
-function extractSalaryNumber(salaryStr) {
-    if (!salaryStr || typeof salaryStr !== 'string') return 0;
-    const numbers = salaryStr.match(/\d+(?:\.\d+)?/g);
-    if (!numbers) return 0;
-    return Math.max(...numbers.map(Number));
-}
-
-// ============================================
-// HELPER: Escape HTML (SAFE VERSION)
-// ============================================
-function escapeHtml(str) {
-    if (!str || typeof str !== 'string') {
-        return '';
-    }
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return str.replace(/[&<>"']/g, function(m) { return map[m]; });
-}
-
-// ============================================
-// EVENT LISTENERS
-// ============================================
-searchBtn.addEventListener('click', fetchJobs);
+// Event Listeners
+searchBtn.addEventListener('click', () => { currentPage = 1; fetchJobs(); });
+prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; fetchJobs(); window.scrollTo(0,0); } });
+nextBtn.addEventListener('click', () => { currentPage++; fetchJobs(); window.scrollTo(0,0); });
 aiSearchBtn.addEventListener('click', fetchAIJobs);
-closeAiBtn.addEventListener('click', () => {
-    aiSummarySection.style.display = 'none';
-});
-sortSelect.addEventListener('change', renderJobs);
+closeAiBtn.addEventListener('click', () => aiSummarySection.style.display = 'none');
 
-searchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        fetchJobs();
-    }
+// Auto-fetch when filters change
+[jobTypeFilter, remoteFilter, experienceFilter].forEach(filter => {
+    filter.addEventListener('change', () => { currentPage = 1; fetchJobs(); });
 });
 
-// ============================================
-// LOAD ON PAGE OPEN
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Job Portal Frontend Loaded');
-    console.log('📡 API URL:', API_URL);
-    fetchJobs();
-});
-
-// ============================================
-// AUTO-REFRESH EVERY 5 MINUTES
-// ============================================
-setInterval(() => {
-    console.log('🔄 Auto-refreshing jobs...');
-    fetchJobs();
-}, 300000);
+document.addEventListener('DOMContentLoaded', fetchJobs);
